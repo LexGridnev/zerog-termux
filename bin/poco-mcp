@@ -1,0 +1,3 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# poco-mcp - Native QuickJS MCP Server Launcher for Antigravity on Termux
+exec qjs -m "$HOME/poco-mcp/server.js" "$@"
