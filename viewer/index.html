@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <title>Agent Viewer — Termux</title>
+  <script src="libs/marked.min.js"></script>
+  <script src="libs/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --heading: #f0f6fc;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --code-bg: #1f242c;
+      --inline-code-bg: #272d36;
+      --quote-border: #388bfd;
+      --success: #3fb950;
+      --warning: #d29922;
+      --danger: #f85149;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.6;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 60px;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(22, 27, 34, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--heading);
+    }
+
+    .brand svg {
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: #121d17;
+      border: 1px solid #238636;
+      color: var(--success);
+      font-family: ui-monospace, SFMono-Regular, monospace;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    .status-dot.syncing {
+      background-color: var(--warning);
+      box-shadow: 0 0 8px var(--warning);
+      animation: pulse 1s infinite alternate;
+    }
+
+    .status-dot.error {
+      background-color: var(--danger);
+      box-shadow: 0 0 8px var(--danger);
+    }
+
+    @keyframes pulse {
+      from { opacity: 0.4; }
+      to { opacity: 1; }
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      border-color: var(--text-muted);
+      color: var(--heading);
+    }
+
+    main {
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 0 16px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px 20px;
+      overflow-wrap: break-word;
+    }
+
+    @media (max-width: 600px) {
+      .card {
+        padding: 16px 12px;
+      }
+      header {
+        padding: 8px 12px;
+      }
+    }
+
+    /* Markdown Styling */
+    h1, h2, h3, h4, h5, h6 {
+      color: var(--heading);
+      margin-top: 1.5em;
+      margin-bottom: 0.6em;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    h1 { font-size: 1.8em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; margin-top: 0.5em; }
+    h2 { font-size: 1.4em; border-bottom: 1px solid var(--border); padding-bottom: 0.2em; }
+    h3 { font-size: 1.2em; }
+    h4 { font-size: 1.05em; }
+
+    p { margin-bottom: 1em; }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+
+    ul, ol {
+      margin-bottom: 1em;
+      padding-left: 2em;
+    }
+    li { margin-bottom: 0.3em; }
+
+    hr {
+      border: 0;
+      height: 1px;
+      background: var(--border);
+      margin: 24px 0;
+    }
+
+    blockquote {
+      border-left: 4px solid var(--quote-border);
+      padding: 6px 16px;
+      color: var(--text-muted);
+      background: #121820;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1em;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.9em;
+      padding: 2px 6px;
+      background-color: var(--inline-code-bg);
+      border-radius: 4px;
+      color: #f0883e;
+    }
+
+    pre {
+      background-color: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      overflow-x: auto;
+      margin-bottom: 1.2em;
+    }
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: var(--text);
+      font-size: 0.88em;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.4em;
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+    th {
+      background-color: #19202a;
+      color: var(--heading);
+      font-weight: 600;
+    }
+    tr:nth-child(even) td {
+      background-color: #11161d;
+    }
+
+    /* Mermaid diagrams */
+    .mermaid-wrapper {
+      position: relative;
+      margin: 1.5em 0;
+      background: #11151c;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .mermaid-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: #161c24;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .mermaid-toolbar button {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .mermaid-viewport {
+      overflow: auto;
+      padding: 16px;
+      text-align: center;
+      touch-action: pan-x pan-y pinch-zoom;
+      -webkit-overflow-scrolling: touch;
+      max-height: 70vh;
+    }
+
+    .mermaid-viewport svg {
+      max-width: 100%;
+      height: auto;
+      display: inline-block;
+      transition: transform 0.2s ease-out;
+      transform-origin: center center;
+    }
+
+    /* Callout blocks (GFM style) */
+    .markdown-alert {
+      padding: 10px 16px;
+      margin-bottom: 1.2em;
+      border-left: 4px solid var(--quote-border);
+      border-radius: 0 6px 6px 0;
+      background: #121820;
+    }
+    .markdown-alert-note { border-left-color: #1f6feb; }
+    .markdown-alert-tip { border-left-color: #238636; }
+    .markdown-alert-important { border-left-color: #8957e5; }
+    .markdown-alert-warning { border-left-color: #9e6a03; }
+    .markdown-alert-caution { border-left-color: #da3633; }
+
+    #error-box {
+      display: none;
+      background: #2b1111;
+      border: 1px solid #671f1f;
+      color: #ff8080;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+
+    /* Tabs & Navigation */
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--heading);
+      background: #1f242c;
+    }
+
+    .tab-btn.active {
+      background: #21262d;
+      border-color: var(--border);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* History view */
+    .history-card {
+      background: #11161d;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .history-card:hover {
+      border-color: var(--accent);
+      background: #161e28;
+    }
+
+    .history-title {
+      font-weight: 600;
+      color: var(--heading);
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .history-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      display: flex;
+      gap: 12px;
+    }
+
+    /* Log viewer */
+    .log-pre {
+      background: #090d13;
+      border: 1px solid var(--border);
+      color: #94a3b8;
+      padding: 16px;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11.5px;
+      line-height: 1.5;
+      max-height: 72vh;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    pre {
+      position: relative;
+    }
+
+    .copy-code-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: #21262d;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 11px;
+      cursor: pointer;
+      opacity: 0.85;
+      transition: all 0.15s;
+      z-index: 5;
+      font-family: inherit;
+    }
+    .copy-code-btn:hover {
+      opacity: 1;
+      color: var(--heading);
+      background: #30363d;
+      border-color: var(--text-muted);
+    }
+    .copy-code-btn.copied {
+      color: var(--success);
+      border-color: #238636;
+      background: #121d17;
+    }
+
+    .search-input {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      width: 100%;
+      outline: none;
+      margin-bottom: 14px;
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+
+    /* Floating Back to Top Button */
+    .floating-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 20px;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--heading);
+      font-size: 18px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      z-index: 90;
+      transition: all 0.2s;
+    }
+    .floating-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    /* Table of contents drawer / block */
+    #toc-drawer {
+      display: none;
+      background: #11161d;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 16px;
+      max-height: 45vh;
+      overflow-y: auto;
+    }
+    .toc-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .toc-list {
+      list-style: none;
+      padding-left: 0;
+      margin-bottom: 0;
+    }
+    .toc-item {
+      padding: 3px 0;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .toc-item.h2 { padding-left: 14px; }
+    .toc-item.h3 { padding-left: 28px; }
+    .toc-link {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .toc-link:hover {
+      color: var(--accent);
+      text-decoration: underline;
+    }
+
+    .font-controls {
+      display: inline-flex;
+      gap: 2px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px;
+    }
+    .font-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 2px 7px;
+      font-size: 11px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .font-btn:hover {
+      color: var(--heading);
+      background: #1f242c;
+    }
+
+    /* Task Manager Styles */
+    .vitals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .vital-card {
+      background: #11161d;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .vital-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .vital-val {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--heading);
+      font-family: ui-monospace, SFMono-Regular, monospace;
+    }
+    .progress-bar-bg {
+      background: #21262d;
+      border-radius: 4px;
+      height: 6px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+    .taskmgr-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      margin-bottom: 0;
+      display: table;
+    }
+    .taskmgr-table th {
+      background: #19202a;
+      padding: 8px 10px;
+      font-weight: 600;
+      color: var(--heading);
+      text-align: left;
+      border: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+    .taskmgr-table th:hover {
+      color: var(--accent);
+    }
+    .taskmgr-table td {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .taskmgr-table tr:hover td {
+      background: #161e28;
+    }
+    .badge-status {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .badge-running { background: #121d17; border: 1px solid #238636; color: var(--success); }
+    .badge-stopped { background: #261b17; border: 1px solid #9e6a03; color: var(--warning); }
+    .badge-done { background: #1c2128; border: 1px solid var(--border); color: var(--text-muted); }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      max-width: 650px;
+      width: 100%;
+      padding: 20px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    /* Document Tab Bar in style of mdviewer-mj */
+    .doc-tab-bar {
+      display: flex;
+      background: #11161d;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      margin-bottom: 0;
+    }
+    .doc-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-right: 1px solid var(--border);
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .doc-tab:hover {
+      background: #161e28;
+      color: var(--text);
+    }
+    .doc-tab.active {
+      background: var(--card-bg);
+      color: var(--heading);
+      border-bottom: 2px solid var(--accent);
+      font-weight: 500;
+    }
+    .doc-tab-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 11px;
+      cursor: pointer;
+      padding: 2px 5px;
+      border-radius: 3px;
+      line-height: 1;
+      opacity: 0.6;
+    }
+    .doc-tab-close:hover {
+      background: #30363d;
+      color: var(--danger);
+      opacity: 1;
+    }
+
+    /* Agent Workspace Cards */
+    .agent-card {
+      background: #11161d;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .agent-card:hover {
+      border-color: var(--accent);
+      background: #161e28;
+    }
+    .agent-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      gap: 8px;
+    }
+    .agent-kind-tag {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 600;
+      background: #1f242c;
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+    .agent-kind-tag.kind-instructions { color: #f0883e; border-color: #f0883e33; background: #261b11; }
+    .agent-kind-tag.kind-skill { color: #58a6ff; border-color: #58a6ff33; background: #121d2a; }
+    .agent-kind-tag.kind-plan { color: #3fb950; border-color: #3fb95033; background: #121d17; }
+    .agent-group-tag {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, monospace;
+    }
+    .agent-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--heading);
+      margin-bottom: 4px;
+    }
+    .agent-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 6px;
+    }
+    .agent-path {
+      font-size: 11px;
+      color: #79c0ff;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+    }
+    .agent-age {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: ui-monospace, monospace;
+    }
+    .agent-badge {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .agent-badge.new { background: #238636; color: #fff; }
+    .agent-badge.changed { background: #d29922; color: #fff; }
+
+    .agent-kind-btn {
+      background: #11161d;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .agent-kind-btn:hover {
+      color: var(--heading);
+      border-color: var(--text-muted);
+    }
+    .agent-kind-btn.active {
+      background: #21262d;
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+      <div class="brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        <span>Agent Viewer</span>
+      </div>
+      <nav class="nav-tabs">
+        <button class="tab-btn active" id="tab-report" onclick="switchTab('report')">📄 Отчет</button>
+        <button class="tab-btn" id="tab-agents" onclick="switchTab('agents')">🤖 Агент</button>
+        <button class="tab-btn" id="tab-history" onclick="switchTab('history')">🕒 История</button>
+        <button class="tab-btn" id="tab-logs" onclick="switchTab('logs')">📜 Логи</button>
+        <button class="tab-btn" id="tab-tasks" onclick="switchTab('tasks')">📊 Диспетчер</button>
+      </nav>
+    </div>
+    <div class="header-actions">
+      <!-- Управление масштабом (Zoom в стиле mdviewer-mj) -->
+      <div id="zoom-controls" class="zoom-controls font-controls">
+        <button class="font-btn" onclick="setDocZoom(currentDocZoom - 10)" title="Уменьшить масштаб (Zoom -)">−</button>
+        <button class="font-btn" id="zoom-badge" onclick="setDocZoom(100)" title="Сбросить масштаб (100%)" style="min-width:38px; font-size:11px;">100%</button>
+        <button class="font-btn" onclick="setDocZoom(currentDocZoom + 10)" title="Увеличить масштаб (Zoom +)">+</button>
+      </div>
+
+      <!-- Управление размером шрифта -->
+      <div id="font-size-controls" class="font-controls">
+        <button class="font-btn" onclick="changeFontSize(-1)" title="Уменьшить шрифт">A−</button>
+        <button class="font-btn" onclick="changeFontSize(1)" title="Увеличить шрифт">A+</button>
+      </div>
+
+      <!-- Кнопка оглавления -->
+      <button class="btn" id="toc-toggle" onclick="toggleTOC()" title="Показать/скрыть оглавление">📑 Оглавление</button>
+
+      <!-- Быстрое открытие локального файла со смартфона -->
+      <label class="btn" title="Открыть локальный .md файл">
+        📂
+        <input type="file" id="file-picker" accept=".md,.markdown,.txt" style="display:none" onchange="handleLocalFile(event)">
+      </label>
+
+      <div class="status-badge">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Live</span>
+      </div>
+      <span id="last-sync" style="font-size: 11px; color: var(--text-muted);">--:--:--</span>
+      <button class="btn" onclick="forceReload()" title="Перезагрузить файл">↻</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="error-box"></div>
+
+    <!-- 1. View: Markdown Report -->
+    <section id="view-report">
+      <!-- Панель вкладок документов (TabBar в стиле mdviewer-mj) -->
+      <div id="doc-tab-bar" class="doc-tab-bar"></div>
+
+      <div id="toc-drawer">
+        <div class="toc-title">
+          <span>Оглавление документа</span>
+          <button class="btn" style="padding:1px 6px; font-size:10px;" onclick="toggleTOC()">✕</button>
+        </div>
+        <ul id="toc-list" class="toc-list"></ul>
+      </div>
+      <article class="card" id="content">
+        <div style="text-align:center; padding: 40px; color: var(--text-muted);">
+          Загрузка отчета...
+        </div>
+      </article>
+    </section>
+
+    <!-- View: Agent Workspace (inspired by mdviewer-mj) -->
+    <section id="view-agents" style="display:none">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px; flex-wrap:wrap;">
+          <div>
+            <h2 style="margin:0; border:none; padding:0; font-size:1.3em;">🤖 Рабочее пространство агента (Agent Workspace)</h2>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Инструкции, память, планы и навыки AI-агентов (Antigravity, Gemini, Claude, Codex)</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn" onclick="loadAgentWorkspace()">↻ Обновить</button>
+          </div>
+        </div>
+
+        <!-- Фильтры по категориям (Kind Filter) -->
+        <div id="agent-filter-kind" class="agent-filter-bar" style="display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;">
+          <button class="agent-kind-btn active" data-kind="all" onclick="setAgentFilterKind('all')">Все</button>
+          <button class="agent-kind-btn" data-kind="instructions" onclick="setAgentFilterKind('instructions')">📋 Инструкции</button>
+          <button class="agent-kind-btn" data-kind="skill" onclick="setAgentFilterKind('skill')">⚡ Навыки</button>
+          <button class="agent-kind-btn" data-kind="plan" onclick="setAgentFilterKind('plan')">🎯 Планы и артефакты</button>
+        </div>
+
+        <input type="text" id="agent-search" class="search-input" placeholder="🔍 Поиск инструкций, навыков, планов..." oninput="filterAgentWorkspace()">
+
+        <div id="agents-container">
+          <div style="text-align:center; padding:30px; color:var(--text-muted);">Загрузка агентского пространства...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. View: History Archive -->
+    <section id="view-history" style="display:none">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px; flex-wrap:wrap;">
+          <h2 style="margin:0; border:none; padding:0; font-size:1.3em;">Архив отчетов и планов</h2>
+          <div style="display:flex; gap:8px;">
+            <label class="btn" title="Открыть файл со смартфона">
+              📂 Локальный файл
+              <input type="file" accept=".md,.markdown,.txt" style="display:none" onchange="handleLocalFile(event)">
+            </label>
+            <button class="btn" onclick="loadReportsHistory()">↻ Обновить</button>
+          </div>
+        </div>
+        <input type="text" id="history-search" class="search-input" placeholder="🔍 Поиск по названию или имени файла..." oninput="filterReports()">
+        <div id="history-container">
+          <div style="text-align:center; padding: 30px; color: var(--text-muted);">Загрузка архива...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. View: Logs Viewer -->
+    <section id="view-logs" style="display:none">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px; flex-wrap:wrap;">
+          <h2 style="margin:0; border:none; padding:0; font-size:1.3em;">Системные логи</h2>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <select id="log-select" class="btn" style="background:#1f242c; padding:5px 8px;" onchange="loadCurrentLog()"></select>
+            <label class="btn" style="cursor:pointer; font-size:11px;">
+              <input type="checkbox" id="log-autorefresh" onchange="toggleLogAutoRefresh()" style="vertical-align:middle;"> ⚡ 3с
+            </label>
+            <button class="btn" onclick="loadLogs()">↻ Обновить</button>
+          </div>
+        </div>
+        <input type="text" id="log-filter" class="search-input" placeholder="🔍 Фильтр строк лога (grep)..." oninput="filterLogOutput()">
+        <pre id="log-output" class="log-pre">Загрузка логов...</pre>
+      </div>
+    </section>
+
+    <!-- 4. View: Task Manager (Processes & Supervision) -->
+    <section id="view-tasks" style="display:none">
+      <!-- System Vitals Cards -->
+      <div class="vitals-grid">
+        <div class="vital-card">
+          <div class="vital-title">Оперативная память (RAM)</div>
+          <div class="vital-val" id="sys-ram-usage">-- MB / -- MB</div>
+          <div class="progress-bar-bg">
+            <div id="sys-ram-bar" class="progress-bar-fill" style="background:#58a6ff; width:0%;"></div>
+          </div>
+        </div>
+
+        <div class="vital-card">
+          <div class="vital-title">Хранилище ($HOME)</div>
+          <div class="vital-val" id="sys-disk-usage">-- / --</div>
+          <div class="progress-bar-bg">
+            <div id="sys-disk-bar" class="progress-bar-fill" style="background:#8957e5; width:0%;"></div>
+          </div>
+        </div>
+
+        <div class="vital-card">
+          <div class="vital-title">
+            <span>Android Phantom Killer</span>
+            <span id="sys-phantom-badge" class="badge-status badge-running">OK</span>
+          </div>
+          <div class="vital-val" id="sys-phantom-text">-- / 32 процессов</div>
+          <div class="progress-bar-bg">
+            <div id="sys-phantom-bar" class="progress-bar-fill" style="background:#238636; width:0%;"></div>
+          </div>
+        </div>
+
+        <div class="vital-card" id="agy-health-card">
+          <div class="vital-title">
+            <span>AGY &amp; POCO Shield</span>
+            <span id="agy-shield-badge" class="badge-status badge-running">ACTIVE</span>
+          </div>
+          <div class="vital-val" id="agy-version-val" style="font-size:14px;">AGY v--</div>
+          <div id="agy-storage-val" style="font-size:12px; color:var(--text-muted); margin-top:4px;">.gemini: -- MB | 0 old bins</div>
+        </div>
+
+        <div class="vital-card">
+          <div class="vital-title">Время работы (Uptime)</div>
+          <div class="vital-val" id="sys-uptime" style="font-size:13px; font-weight:normal; line-height:1.4;">--</div>
+        </div>
+      </div>
+
+      <!-- Supervised Tasks Card -->
+      <div class="card" style="margin-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px; flex-wrap:wrap;">
+          <h2 style="margin:0; border:none; padding:0; font-size:1.2em;">Фоновые задачи (Supervisor)</h2>
+          <div style="display:flex; gap:8px;">
+            <button class="btn" onclick="loadTaskManagerData()">↻ Обновить</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="tasks-table" class="taskmgr-table">
+            <thead>
+              <tr>
+                <th>Имя задачи</th>
+                <th>PID</th>
+                <th>Статус</th>
+                <th>Запущен</th>
+                <th>Команда</th>
+                <th>Лог</th>
+              </tr>
+            </thead>
+            <tbody id="tasks-tbody">
+              <tr><td colspan="6" style="text-align:center; padding:16px; color:var(--text-muted);">Загрузка задач...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Active Processes Card -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px; flex-wrap:wrap;">
+          <h2 style="margin:0; border:none; padding:0; font-size:1.2em;">Активные процессы Termux</h2>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <label class="btn" style="cursor:pointer; font-size:11px;">
+              <input type="checkbox" id="taskmgr-autorefresh" onchange="toggleTaskMgrAutoRefresh()" style="vertical-align:middle;"> ⚡ 2с
+            </label>
+            <button class="btn" onclick="sortProcesses('cpu')">Sort: CPU%</button>
+            <button class="btn" onclick="sortProcesses('mem')">Sort: RAM</button>
+            <button class="btn" onclick="sortProcesses('pid')">Sort: PID</button>
+            <button class="btn" onclick="loadTaskManagerData()">↻</button>
+          </div>
+        </div>
+
+        <input type="text" id="proc-search" class="search-input" placeholder="🔍 Поиск процессов по имени, команде или PID..." oninput="filterProcesses()">
+
+        <div style="overflow-x:auto; max-height:60vh;">
+          <table id="proc-table" class="taskmgr-table">
+            <thead>
+              <tr>
+                <th onclick="sortProcesses('pid')">PID</th>
+                <th onclick="sortProcesses('cpu')">%CPU</th>
+                <th onclick="sortProcesses('mem')">%RAM</th>
+                <th>RSS</th>
+                <th>STAT</th>
+                <th>TIME</th>
+                <th onclick="sortProcesses('comm')">COMMAND</th>
+                <th>ДЕЙСТВИЯ</th>
+              </tr>
+            </thead>
+            <tbody id="proc-tbody">
+              <tr><td colspan="8" style="text-align:center; padding:20px; color:var(--text-muted);">Загрузка процессов...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Process Details Modal -->
+  <div id="proc-modal" class="modal-overlay" onclick="closeProcessModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+        <h3 id="modal-title" style="margin:0; font-size:1.2em;">Сведения о процессе</h3>
+        <button class="btn" onclick="closeProcessModal()">✕</button>
+      </div>
+      <div id="modal-body" style="font-family:ui-monospace, monospace; font-size:12px; white-space:pre-wrap; line-height:1.5;"></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button id="modal-kill-btn" class="btn" style="background:#2b1111; color:#ff8080; border-color:#671f1f;">Завершить (SIGTERM)</button>
+        <button class="btn" onclick="closeProcessModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <button id="back-to-top" class="floating-btn" onclick="window.scrollTo({top:0, behavior:'smooth'})" title="Наверх">↑</button>
+
+  <script>
+    let currentTab = 'report';
+    let TARGET_FILE = 'latest.md';
+    const POLL_INTERVAL_MS = 1500;
+
+    let lastEtag = null;
+    let lastModified = null;
+    let isFetching = false;
+
+    // Поддержка URL параметров: ?file=... или ?tab=...
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('file')) {
+      TARGET_FILE = urlParams.get('file');
+    }
+
+    // Управление размером шрифта
+    let currentFontSize = 15;
+
+    function initFontSize() {
+      const saved = localStorage.getItem('agent-viewer-font-size');
+      if (saved) {
+        const size = parseInt(saved, 10);
+        if (!isNaN(size) && size >= 12 && size <= 24) {
+          currentFontSize = size;
+          document.body.style.fontSize = currentFontSize + 'px';
+        }
+      }
+    }
+
+    function changeFontSize(delta) {
+      currentFontSize = Math.max(12, Math.min(24, currentFontSize + delta));
+      document.body.style.fontSize = currentFontSize + 'px';
+      localStorage.setItem('agent-viewer-font-size', currentFontSize.toString());
+      applyDocZoom();
+    }
+
+    // Управление масштабированием документа (Zoom в стиле mdviewer-mj)
+    let currentDocZoom = 100;
+
+    function initDocZoom() {
+      const saved = localStorage.getItem('agent-viewer-zoom');
+      if (saved) {
+        const val = parseInt(saved, 10);
+        if (!isNaN(val) && val >= 50 && val <= 200) {
+          currentDocZoom = val;
+        }
+      }
+      applyDocZoom();
+    }
+
+    function setDocZoom(percent) {
+      currentDocZoom = Math.max(50, Math.min(200, percent));
+      localStorage.setItem('agent-viewer-zoom', currentDocZoom.toString());
+      applyDocZoom();
+    }
+
+    function applyDocZoom() {
+      const content = document.getElementById('content');
+      if (content) {
+        content.style.fontSize = ((currentDocZoom / 100) * currentFontSize) + 'px';
+      }
+      const badge = document.getElementById('zoom-badge');
+      if (badge) {
+        badge.textContent = currentDocZoom + '%';
+      }
+    }
+
+    // Управление многодокументными вкладками (TabBar в стиле mdviewer-mj)
+    let openDocTabs = [
+      { url: 'latest.md', title: 'latest.md' }
+    ];
+    let activeDocTabIndex = 0;
+
+    function renderDocTabs() {
+      const bar = document.getElementById('doc-tab-bar');
+      if (!bar) return;
+      let html = '';
+      openDocTabs.forEach((tab, idx) => {
+        const isActive = (idx === activeDocTabIndex);
+        html += `
+          <div class="doc-tab ${isActive ? 'active' : ''}" onclick="switchDocTab(${idx})">
+            <span class="doc-tab-title">📄 ${escapeHtml(tab.title)}</span>
+            <button class="doc-tab-close" onclick="closeDocTab(event, ${idx})" title="Закрыть вкладку">✕</button>
+          </div>
+        `;
+      });
+      bar.innerHTML = html;
+    }
+
+    function switchDocTab(index) {
+      if (index < 0 || index >= openDocTabs.length) return;
+      activeDocTabIndex = index;
+      TARGET_FILE = openDocTabs[index].url;
+      renderDocTabs();
+      forceReload();
+    }
+
+    function closeDocTab(event, index) {
+      if (event) event.stopPropagation();
+      if (openDocTabs.length <= 1) {
+        openDocTabs[0] = { url: 'latest.md', title: 'latest.md' };
+        activeDocTabIndex = 0;
+        TARGET_FILE = 'latest.md';
+        renderDocTabs();
+        forceReload();
+        return;
+      }
+      openDocTabs.splice(index, 1);
+      if (activeDocTabIndex >= openDocTabs.length) {
+        activeDocTabIndex = openDocTabs.length - 1;
+      }
+      TARGET_FILE = openDocTabs[activeDocTabIndex].url;
+      renderDocTabs();
+      forceReload();
+    }
+
+    function openDocumentInTab(url, title) {
+      const existingIdx = openDocTabs.findIndex(t => t.url === url);
+      if (existingIdx !== -1) {
+        activeDocTabIndex = existingIdx;
+      } else {
+        const tabTitle = title || url.split('/').pop();
+        openDocTabs.push({ url, title: tabTitle });
+        activeDocTabIndex = openDocTabs.length - 1;
+      }
+      TARGET_FILE = url;
+      renderDocTabs();
+      switchTab('report');
+      forceReload();
+    }
+
+    // Оглавление документа (TOC)
+    function toggleTOC() {
+      const drawer = document.getElementById('toc-drawer');
+      if (!drawer) return;
+      drawer.style.display = (drawer.style.display === 'block') ? 'none' : 'block';
+    }
+
+    function generateTOC() {
+      const content = document.getElementById('content');
+      const tocList = document.getElementById('toc-list');
+      const tocDrawer = document.getElementById('toc-drawer');
+      const toggleBtn = document.getElementById('toc-toggle');
+      if (!content || !tocList) return;
+
+      const headings = content.querySelectorAll('h1, h2, h3');
+      tocList.innerHTML = '';
+
+      if (headings.length === 0) {
+        if (tocDrawer) tocDrawer.style.display = 'none';
+        if (toggleBtn) toggleBtn.style.display = 'none';
+        return;
+      }
+
+      if (toggleBtn) toggleBtn.style.display = 'inline-flex';
+
+      headings.forEach((heading, idx) => {
+        let id = heading.id;
+        if (!id) {
+          id = 'heading-' + idx;
+          heading.id = id;
+        }
+        const li = document.createElement('li');
+        li.className = 'toc-item ' + heading.tagName.toLowerCase();
+        const a = document.createElement('a');
+        a.href = '#' + id;
+        a.className = 'toc-link';
+        a.textContent = heading.textContent;
+        a.onclick = (e) => {
+          e.preventDefault();
+          heading.scrollIntoView({ behavior: 'smooth' });
+        };
+        li.appendChild(a);
+        tocList.appendChild(li);
+      });
+    }
+
+    // Копирование блоков кода
+    function addCopyButtons() {
+      const preBlocks = document.querySelectorAll('#content pre');
+      preBlocks.forEach((pre) => {
+        if (pre.querySelector('.copy-code-btn') || pre.classList.contains('mermaid')) return;
+        const btn = document.createElement('button');
+        btn.className = 'copy-code-btn';
+        btn.textContent = 'Копировать';
+        btn.onclick = () => copyCode(btn, pre);
+        pre.appendChild(btn);
+      });
+    }
+
+    async function copyCode(btn, pre) {
+      const codeEl = pre.querySelector('code');
+      const text = codeEl ? codeEl.innerText : pre.innerText;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        btn.textContent = 'Скопировано!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Копировать';
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Copy failed:', err);
+        btn.textContent = 'Ошибка';
+        setTimeout(() => {
+          btn.textContent = 'Копировать';
+        }, 2000);
+      }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = document.getElementById('tab-' + tab);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      document.getElementById('view-report').style.display = (tab === 'report') ? 'block' : 'none';
+      document.getElementById('view-agents').style.display = (tab === 'agents') ? 'block' : 'none';
+      document.getElementById('view-history').style.display = (tab === 'history') ? 'block' : 'none';
+      document.getElementById('view-logs').style.display = (tab === 'logs') ? 'block' : 'none';
+      document.getElementById('view-tasks').style.display = (tab === 'tasks') ? 'block' : 'none';
+
+      if (tab === 'agents') {
+        loadAgentWorkspace();
+      } else if (tab === 'history') {
+        loadReportsHistory();
+      } else if (tab === 'logs') {
+        loadLogs();
+      } else if (tab === 'tasks') {
+        loadTaskManagerData();
+      } else if (tab === 'report') {
+        forceReload();
+      }
+    }
+
+    /* Task Manager (Processes & Supervision) Controller */
+    let taskMgrData = null;
+    let allProcesses = [];
+    let currentProcSort = 'cpu';
+    let taskMgrAutoRefreshInterval = null;
+
+    async function loadTaskManagerData() {
+      try {
+        const resp = await fetch('taskmgr.json?_t=' + Date.now(), { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        taskMgrData = await resp.json();
+
+        // 1. Render System Vitals
+        if (taskMgrData.system) {
+          const sys = taskMgrData.system;
+          if (sys.memory) {
+            document.getElementById('sys-ram-usage').textContent = `${sys.memory.used_mb} MB / ${sys.memory.total_mb} MB (${sys.memory.used_pct}%)`;
+            document.getElementById('sys-ram-bar').style.width = `${sys.memory.used_pct}%`;
+          }
+          if (sys.storage) {
+            document.getElementById('sys-disk-usage').textContent = `${sys.storage.used} / ${sys.storage.total} (${sys.storage.used_pct}%)`;
+            document.getElementById('sys-disk-bar').style.width = `${sys.storage.used_pct}%`;
+          }
+          if (sys.phantom_processes) {
+            const ph = sys.phantom_processes;
+            document.getElementById('sys-phantom-text').textContent = `${ph.current} / ${ph.limit} процессов (${ph.remaining} свободно)`;
+            const bar = document.getElementById('sys-phantom-bar');
+            bar.style.width = `${ph.pct}%`;
+            bar.style.background = (ph.status === 'danger') ? '#f85149' : ((ph.status === 'warn') ? '#d29922' : '#238636');
+
+            const badge = document.getElementById('sys-phantom-badge');
+            if (badge) {
+              badge.textContent = ph.status.toUpperCase();
+              badge.className = `badge-status badge-${ph.status === 'ok' ? 'running' : (ph.status === 'warn' ? 'stopped' : 'danger')}`;
+            }
+          }
+          if (sys.uptime) {
+            document.getElementById('sys-uptime').textContent = sys.uptime;
+          }
+        }
+
+        // 1b. Render AGY Health & POCO Shield
+        if (taskMgrData.agy_health) {
+          const ah = taskMgrData.agy_health;
+          const verEl = document.getElementById('agy-version-val');
+          if (verEl) verEl.textContent = `AGY v${ah.agy_version || '--'} (${ah.conversations_count || 0} сессий)`;
+          const stEl = document.getElementById('agy-storage-val');
+          if (stEl) stEl.textContent = `.gemini: ${ah.gemini_dir_mb || 0} MB | Old bins: ${ah.old_binaries_count || 0} (${ah.old_binaries_mb || 0} MB)`;
+          const shEl = document.getElementById('agy-shield-badge');
+          if (shEl) {
+            shEl.textContent = (ah.hyperos_shield === 'wakelock-active') ? 'WAKELOCK' : 'SHIELD ON';
+            shEl.className = 'badge-status badge-running';
+          }
+        }
+
+        // 2. Render Supervised Tasks
+        renderSupervisedTasks(taskMgrData.supervised_tasks || []);
+
+        // 3. Render Active Processes
+        allProcesses = taskMgrData.processes || [];
+        filterProcesses();
+      } catch (err) {
+        console.error('Task manager data load error:', err);
+        const tbody = document.getElementById('proc-tbody');
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="color:var(--danger); padding:16px;">Ошибка загрузки taskmgr.json: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function renderSupervisedTasks(tasks) {
+      const tbody = document.getElementById('tasks-tbody');
+      if (!tbody) return;
+      if (!tasks || tasks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:16px; color:var(--text-muted);">Нет зарегистрированных фоновых задач. Запустите: <code>tm run &lt;name&gt; -- &lt;cmd&gt;</code></td></tr>';
+        return;
+      }
+
+      let html = '';
+      for (const t of tasks) {
+        const badgeCls = (t.status === 'RUNNING') ? 'badge-running' : ((t.status === 'STOPPED') ? 'badge-stopped' : 'badge-done');
+        const timeShort = (t.started_at || '').substring(11, 19) || '--:--:--';
+        html += `
+          <tr>
+            <td style="font-weight:600; color:var(--heading);">${escapeHtml(t.name)}</td>
+            <td>${t.pid || '--'}</td>
+            <td><span class="badge-status ${badgeCls}">${escapeHtml(t.status)}</span></td>
+            <td>${escapeHtml(timeShort)}</td>
+            <td style="max-width:250px; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(t.command)}">${escapeHtml(t.command)}</td>
+            <td>
+              <button class="btn" style="padding:2px 7px; font-size:10px;" onclick="viewTaskLog('${escapeHtml(t.name)}')">Лог</button>
+            </td>
+          </tr>
+        `;
+      }
+      tbody.innerHTML = html;
+    }
+
+    function filterProcesses() {
+      const query = (document.getElementById('proc-search')?.value || '').toLowerCase().trim();
+      let procs = allProcesses;
+      if (query) {
+        procs = procs.filter(p =>
+          String(p.pid).includes(query) ||
+          (p.comm && p.comm.toLowerCase().includes(query)) ||
+          (p.user && p.user.toLowerCase().includes(query))
+        );
+      }
+      sortAndRenderProcesses(procs);
+    }
+
+    function sortProcesses(sortKey) {
+      currentProcSort = sortKey;
+      filterProcesses();
+    }
+
+    function sortAndRenderProcesses(procs) {
+      const sorted = [...procs].sort((a, b) => {
+        if (currentProcSort === 'cpu') return (parseFloat(b.cpu) || 0) - (parseFloat(a.cpu) || 0);
+        if (currentProcSort === 'mem') return (parseFloat(b.mem) || 0) - (parseFloat(a.mem) || 0);
+        if (currentProcSort === 'pid') return (parseInt(a.pid, 10) || 0) - (parseInt(b.pid, 10) || 0);
+        if (currentProcSort === 'comm') return String(a.comm).localeCompare(String(b.comm));
+        return 0;
+      });
+      renderProcessesTable(sorted);
+    }
+
+    function renderProcessesTable(procs) {
+      const tbody = document.getElementById('proc-tbody');
+      if (!tbody) return;
+      if (!procs || procs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:16px; color:var(--text-muted);">Процессы не найдены.</td></tr>';
+        return;
+      }
+
+      let html = '';
+      for (const p of procs) {
+        const memMb = (p.rss_kb ? (p.rss_kb / 1024).toFixed(1) + ' MB' : '--');
+        html += `
+          <tr>
+            <td style="font-weight:600; color:var(--accent);">${p.pid}</td>
+            <td style="color:${parseFloat(p.cpu) > 10 ? 'var(--warning)' : 'inherit'};">${p.cpu}%</td>
+            <td>${p.mem}%</td>
+            <td>${memMb}</td>
+            <td><span style="color:var(--text-muted);">${escapeHtml(p.stat || '--')}</span></td>
+            <td>${escapeHtml(p.time || '--')}</td>
+            <td style="color:var(--heading); font-weight:500;">${escapeHtml(p.comm)}</td>
+            <td>
+              <button class="btn" style="padding:2px 7px; font-size:10px;" onclick="showProcessModal(${p.pid})">Инфо</button>
+              <button class="btn" style="padding:2px 7px; font-size:10px; color:#ff8080;" onclick="killProcessPrompt(${p.pid}, '${escapeHtml(p.comm)}')">✕</button>
+            </td>
+          </tr>
+        `;
+      }
+      tbody.innerHTML = html;
+    }
+
+    function showProcessModal(pid) {
+      const modal = document.getElementById('proc-modal');
+      const title = document.getElementById('modal-title');
+      const body = document.getElementById('modal-body');
+      const killBtn = document.getElementById('modal-kill-btn');
+      if (!modal) return;
+
+      const p = allProcesses.find(item => item.pid === pid);
+      title.textContent = `Сведения о процессе PID: ${pid}`;
+      if (p) {
+        body.textContent = `
+PID:        ${p.pid}
+PPID:       ${p.ppid}
+User:       ${p.user}
+Command:    ${p.comm}
+CPU:        ${p.cpu}%
+Memory:     ${p.mem}% (${(p.rss_kb ? (p.rss_kb / 1024).toFixed(1) + ' MB' : '--')})
+State:      ${p.stat}
+Time:       ${p.time}
+        `.trim();
+      } else {
+        body.textContent = `Процесс PID ${pid}`;
+      }
+
+      killBtn.onclick = () => killProcessPrompt(pid, p ? p.comm : '');
+      modal.style.display = 'flex';
+    }
+
+    function closeProcessModal(event) {
+      const modal = document.getElementById('proc-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    function killProcessPrompt(pid, comm) {
+      if (confirm(`Завершить процесс ${comm || ''} (PID ${pid})?\n\nДля завершения из консоли Termux используйте:\ntm kill ${pid}`)) {
+        alert(`Для завершения процесса выполните команду в консоли:\ntm kill ${pid}`);
+      }
+    }
+
+    function viewTaskLog(taskName) {
+      switchTab('logs');
+      // If log exists, try to select it
+      const select = document.getElementById('log-select');
+      if (select) {
+        for (let i = 0; i < select.options.length; i++) {
+          if (select.options[i].text.includes(taskName)) {
+            select.selectedIndex = i;
+            loadCurrentLog();
+            return;
+          }
+        }
+      }
+    }
+
+    function toggleTaskMgrAutoRefresh() {
+      const chk = document.getElementById('taskmgr-autorefresh');
+      if (!chk) return;
+      if (chk.checked) {
+        if (!taskMgrAutoRefreshInterval) {
+          taskMgrAutoRefreshInterval = setInterval(() => {
+            if (currentTab === 'tasks') loadTaskManagerData();
+          }, 2000);
+        }
+      } else {
+        if (taskMgrAutoRefreshInterval) {
+          clearInterval(taskMgrAutoRefreshInterval);
+          taskMgrAutoRefreshInterval = null;
+        }
+      }
+    }
+
+    let allReports = [];
+
+    async function loadReportsHistory() {
+      const container = document.getElementById('history-container');
+      container.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-muted);">Загрузка архива отчетов...</div>';
+      try {
+        const resp = await fetch('reports.json?_t=' + Date.now(), { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        allReports = await resp.json();
+        renderReports(allReports);
+      } catch (err) {
+        container.innerHTML = `<div style="color:var(--danger); padding:10px;">Ошибка загрузки архива: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function filterReports() {
+      const query = (document.getElementById('history-search')?.value || '').toLowerCase().trim();
+      if (!query) {
+        renderReports(allReports);
+        return;
+      }
+      const filtered = (allReports || []).filter(item =>
+        (item.title && item.title.toLowerCase().includes(query)) ||
+        (item.filename && item.filename.toLowerCase().includes(query))
+      );
+      renderReports(filtered);
+    }
+
+    function renderReports(reports) {
+      const container = document.getElementById('history-container');
+      if (!container) return;
+      if (!reports || reports.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; color: var(--text-muted);">Ничего не найдено.</div>';
+        return;
+      }
+
+      let html = '';
+      for (const item of reports) {
+        const isCurrent = (TARGET_FILE === item.url);
+        const sizeKb = (item.size / 1024).toFixed(1) + ' KB';
+        html += `
+          <div class="history-card" onclick="openReport('${escapeHtml(item.url)}')">
+            <div>
+              <div class="history-title">${escapeHtml(item.title)} ${isCurrent ? '<span style="font-size:10px; background:#238636; color:#fff; padding:1px 6px; border-radius:10px; margin-left:6px;">ТЕКУЩИЙ</span>' : ''}</div>
+              <div class="history-meta">
+                <span>📄 ${escapeHtml(item.filename)}</span>
+                <span>🕒 ${escapeHtml(item.mtime)}</span>
+                <span>💾 ${sizeKb}</span>
+              </div>
+            </div>
+            <button class="btn" onclick="event.stopPropagation(); openReport('${escapeHtml(item.url)}')">Открыть</button>
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    function openReport(fileUrl) {
+      openDocumentInTab(fileUrl, fileUrl.split('/').pop());
+    }
+
+    /* Agent Workspace (inspired by mdviewer-mj) Controller */
+    let agentWorkspaceData = null;
+    let currentAgentKindFilter = 'all';
+
+    async function loadAgentWorkspace() {
+      const container = document.getElementById('agents-container');
+      try {
+        const resp = await fetch('agents.json?_t=' + Date.now(), { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        agentWorkspaceData = await resp.json();
+        renderAgentWorkspace(agentWorkspaceData.entries || []);
+      } catch (err) {
+        if (container) {
+          container.innerHTML = `<div style="color:var(--danger); padding:20px;">Ошибка загрузки agents.json: ${escapeHtml(err.message)}</div>`;
+        }
+      }
+    }
+
+    function setAgentFilterKind(kind) {
+      currentAgentKindFilter = kind;
+      document.querySelectorAll('.agent-kind-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-kind') === kind);
+      });
+      filterAgentWorkspace();
+    }
+
+    function filterAgentWorkspace() {
+      if (!agentWorkspaceData || !agentWorkspaceData.entries) return;
+      const query = (document.getElementById('agent-search')?.value || '').toLowerCase().trim();
+      const filtered = agentWorkspaceData.entries.filter(entry => {
+        const matchesKind = (currentAgentKindFilter === 'all' || entry.kind === currentAgentKindFilter);
+        if (!matchesKind) return false;
+        if (!query) return true;
+        return (entry.title && entry.title.toLowerCase().includes(query)) ||
+               (entry.description && entry.description.toLowerCase().includes(query)) ||
+               (entry.group && entry.group.toLowerCase().includes(query)) ||
+               (entry.path && entry.path.toLowerCase().includes(query));
+      });
+      renderAgentWorkspace(filtered);
+    }
+
+    function formatAgentAge(timestampMs) {
+      if (!timestampMs) return '';
+      const now = Date.now();
+      const diffSec = Math.floor((now - timestampMs) / 1000);
+      if (diffSec < 60) return 'только что';
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return diffMin + ' мин назад';
+      const diffHours = Math.floor(diffMin / 60);
+      if (diffHours < 24) return diffHours + ' ч назад';
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays < 30) return diffDays + ' дн назад';
+      return new Date(timestampMs).toLocaleDateString('ru-RU');
+    }
+
+    function renderAgentWorkspace(entries) {
+      const container = document.getElementById('agents-container');
+      if (!container) return;
+      if (!entries || entries.length === 0) {
+        container.innerHTML = '<div style="padding:20px; color:var(--text-muted); text-align:center;">Ничего не найдено.</div>';
+        return;
+      }
+
+      let html = '';
+      const kindIcons = {
+        instructions: '📋',
+        skill: '⚡',
+        plan: '🎯',
+        memory: '🧠',
+        agent: '🤖',
+        command: '⌨️'
+      };
+
+      const kindLabels = {
+        instructions: 'Инструкция',
+        skill: 'Навык',
+        plan: 'План/Отчет',
+        memory: 'Память',
+        agent: 'Субагент',
+        command: 'Команда'
+      };
+
+      for (const entry of entries) {
+        const icon = kindIcons[entry.kind] || '📄';
+        const kindLabel = kindLabels[entry.kind] || entry.kind;
+        const age = formatAgentAge(entry.modified);
+        const statusBadge = entry.isNew ? '<span class="agent-badge new">New</span>' : (entry.unread ? '<span class="agent-badge changed">Changed</span>' : '');
+
+        html += `
+          <div class="agent-card" onclick="openAgentDoc('${escapeHtml(entry.path)}', '${escapeHtml(entry.title)}')">
+            <div class="agent-card-header">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="agent-kind-tag kind-${escapeHtml(entry.kind)}">${icon} ${escapeHtml(kindLabel)}</span>
+                <span class="agent-group-tag">${escapeHtml(entry.group)}</span>
+                ${statusBadge}
+              </div>
+              <span class="agent-age">${escapeHtml(age)}</span>
+            </div>
+            <div class="agent-title">${escapeHtml(entry.title)}</div>
+            ${entry.description ? `<div class="agent-desc">${escapeHtml(entry.description)}</div>` : ''}
+            <div class="agent-path">📁 ${escapeHtml(entry.path)}</div>
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    function openAgentDoc(path, title) {
+      openDocumentInTab(path, title);
+    }
+
+    let logAutoRefreshInterval = null;
+    let currentRawLogText = '';
+
+    function toggleLogAutoRefresh() {
+      const checkbox = document.getElementById('log-autorefresh');
+      if (!checkbox) return;
+      if (checkbox.checked) {
+        if (!logAutoRefreshInterval) {
+          logAutoRefreshInterval = setInterval(() => {
+            if (currentTab === 'logs') loadCurrentLog();
+          }, 3000);
+        }
+      } else {
+        if (logAutoRefreshInterval) {
+          clearInterval(logAutoRefreshInterval);
+          logAutoRefreshInterval = null;
+        }
+      }
+    }
+
+    function filterLogOutput() {
+      const filterVal = (document.getElementById('log-filter')?.value || '').toLowerCase().trim();
+      const pre = document.getElementById('log-output');
+      if (!pre) return;
+      if (!filterVal) {
+        pre.textContent = currentRawLogText || '(Лог-файл пуст)';
+        return;
+      }
+      const lines = currentRawLogText.split('\n');
+      const matched = lines.filter(line => line.toLowerCase().includes(filterVal));
+      pre.textContent = matched.length > 0 ? matched.join('\n') : `(Строк по фильтру "${filterVal}" не найдено)`;
+    }
+
+    async function loadLogs() {
+      const select = document.getElementById('log-select');
+      try {
+        const resp = await fetch('logs.json?_t=' + Date.now(), { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const logs = await resp.json();
+
+        select.innerHTML = '';
+        for (const item of logs) {
+          const opt = document.createElement('option');
+          opt.value = item.url;
+          opt.textContent = item.name;
+          select.appendChild(opt);
+        }
+
+        if (logs.length > 0) {
+          loadCurrentLog();
+        } else {
+          document.getElementById('log-output').textContent = 'Логи не найдены.';
+        }
+      } catch (err) {
+        document.getElementById('log-output').textContent = 'Ошибка загрузки реестра логов: ' + err.message;
+      }
+    }
+
+    async function loadCurrentLog() {
+      const select = document.getElementById('log-select');
+      const logUrl = select.value;
+      const pre = document.getElementById('log-output');
+      if (!logUrl) return;
+
+      try {
+        const resp = await fetch(logUrl + '?_t=' + Date.now(), { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const text = await resp.text();
+        currentRawLogText = text;
+        filterLogOutput();
+        pre.scrollTop = pre.scrollHeight;
+      } catch (err) {
+        pre.textContent = 'Ошибка чтения лога (' + logUrl + '): ' + err.message;
+      }
+    }
+
+    // Инициализация Mermaid
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      securityLevel: 'loose',
+      fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif'
+    });
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    // Настройка Marked v15+ через marked.use
+    marked.use({
+      gfm: true,
+      breaks: false,
+      renderer: {
+        code(token, langParam) {
+          let text = '';
+          let lang = '';
+          if (typeof token === 'object' && token !== null) {
+            text = token.text || '';
+            lang = token.lang || '';
+          } else {
+            text = token || '';
+            lang = langParam || '';
+          }
+
+          if (lang === 'mermaid') {
+            const id = 'mermaid-' + Math.random().toString(36).substring(2, 9);
+            return `
+              <div class="mermaid-wrapper" id="wrap-${id}">
+                <div class="mermaid-toolbar">
+                  <span>Mermaid Diagram</span>
+                  <button onclick="zoomDiagram('svg-${id}', 1.2)">+</button>
+                  <button onclick="zoomDiagram('svg-${id}', 0.8)">−</button>
+                  <button onclick="resetZoom('svg-${id}')">100%</button>
+                </div>
+                <div class="mermaid-viewport">
+                  <pre class="mermaid" id="${id}">${escapeHtml(text)}</pre>
+                </div>
+              </div>
+            `;
+          }
+          // Возврат false передает токен стандартному рендереру Marked
+          return false;
+        }
+      }
+    });
+
+    // Зум диаграмм
+    window.zoomDiagram = function(id, factor) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      let cur = parseFloat(el.getAttribute('data-scale') || '1');
+      cur = Math.max(0.4, Math.min(4.0, cur * factor));
+      el.setAttribute('data-scale', cur);
+      el.style.transform = `scale(${cur})`;
+    };
+
+    window.resetZoom = function(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.setAttribute('data-scale', '1');
+      el.style.transform = 'scale(1)';
+    };
+
+    async function checkAndUpdate() {
+      if (isFetching || currentTab !== 'report') return;
+      try {
+        const headResp = await fetch(TARGET_FILE, {
+          method: 'HEAD',
+          cache: 'no-store'
+        });
+
+        if (!headResp.ok) {
+          showError(`Файл ${TARGET_FILE} не найден (HTTP ${headResp.status})`);
+          setStatus('error', 'Not Found');
+          return;
+        }
+
+        const etag = headResp.headers.get('ETag');
+        const modified = headResp.headers.get('Last-Modified');
+        const contentLength = headResp.headers.get('Content-Length');
+        const token = `${etag}|${modified}|${contentLength}`;
+
+        if (token !== lastEtag) {
+          setStatus('syncing', 'Syncing');
+          await loadContent();
+          lastEtag = token;
+          lastModified = modified;
+          setStatus('live', 'Live');
+          updateLastSyncTime();
+        } else {
+          setStatus('live', 'Live');
+        }
+      } catch (err) {
+        console.error('Polling error:', err);
+        setStatus('error', 'Offline');
+      }
+    }
+
+    async function renderMermaidInElement(contentEl) {
+      const mermaidNodes = contentEl.querySelectorAll('.mermaid');
+      for (let i = 0; i < mermaidNodes.length; i++) {
+        const node = mermaidNodes[i];
+        const rawCode = node.textContent;
+        const svgId = 'svg-' + node.id;
+        try {
+          const { svg } = await mermaid.render(svgId, rawCode);
+          node.outerHTML = svg;
+        } catch (mErr) {
+          console.error('Mermaid render error:', mErr);
+          node.innerHTML = `<span style="color:var(--danger)">Ошибка синтаксиса диаграммы: ${escapeHtml(mErr.message)}</span><pre style="margin-top:8px">${escapeHtml(rawCode)}</pre>`;
+        } finally {
+          const tempDiv = document.getElementById('d' + svgId);
+          if (tempDiv) tempDiv.remove();
+        }
+      }
+    }
+
+    function handleLocalFile(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const mdText = e.target.result;
+        TARGET_FILE = file.name;
+        switchTab('report');
+        const contentEl = document.getElementById('content');
+        contentEl.innerHTML = marked.parse(mdText);
+        hideError();
+        await renderMermaidInElement(contentEl);
+        generateTOC();
+        addCopyButtons();
+        setStatus('live', 'Local: ' + file.name);
+        updateLastSyncTime();
+      };
+      reader.onerror = function(err) {
+        showError('Ошибка чтения локального файла: ' + err.message);
+      };
+      reader.readAsText(file);
+    }
+
+    async function loadContent() {
+      isFetching = true;
+      try {
+        const resp = await fetch(TARGET_FILE + '?_t=' + Date.now(), { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const mdText = await resp.text();
+
+        const contentEl = document.getElementById('content');
+        contentEl.innerHTML = marked.parse(mdText);
+        hideError();
+
+        // Рендеринг всех mermaid блоков
+        await renderMermaidInElement(contentEl);
+
+        // Генерация оглавления и кнопок копирования
+        generateTOC();
+        addCopyButtons();
+      } catch (err) {
+        showError('Ошибка загрузки содержимого: ' + err.message);
+      } finally {
+        isFetching = false;
+      }
+    }
+
+    function forceReload() {
+      lastEtag = null;
+      checkAndUpdate();
+    }
+
+    function setStatus(state, text) {
+      const dot = document.getElementById('status-dot');
+      const label = document.getElementById('status-text');
+      dot.className = 'status-dot';
+      if (state === 'syncing') dot.classList.add('syncing');
+      if (state === 'error') dot.classList.add('error');
+      label.textContent = text;
+    }
+
+    function updateLastSyncTime() {
+      const now = new Date();
+      document.getElementById('last-sync').textContent = now.toLocaleTimeString();
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error-box');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function hideError() {
+      document.getElementById('error-box').style.display = 'none';
+    }
+
+    // Обработчик кнопки "Наверх" при прокрутке
+    window.addEventListener('scroll', () => {
+      const btn = document.getElementById('back-to-top');
+      if (!btn) return;
+      if (window.scrollY > 300) {
+        btn.style.display = 'flex';
+      } else {
+        btn.style.display = 'none';
+      }
+    });
+
+    // Инициализация и старт опроса
+    initFontSize();
+    initDocZoom();
+    renderDocTabs();
+    if (urlParams.has('tab')) {
+      switchTab(urlParams.get('tab'));
+    } else {
+      checkAndUpdate();
+    }
+    setInterval(checkAndUpdate, POLL_INTERVAL_MS);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
