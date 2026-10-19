@@ -1,0 +1,192 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# tmd - Terminal Markdown Viewer for Termux
+# Supports mdcat (Mermaid diagrams in terminal), glow, lowdown, pager, and watch mode.
+
+set -e
+
+DEFAULT_FILE="$HOME/agent-viewer/latest.md"
+ENGINE=""
+PAGER_FLAG=""
+WATCH_MODE=0
+TARGET=""
+
+show_help() {
+  cat << 'EOF'
+Usage: tmd [options] [file.md | -]
+       md  [options] [file.md | -]
+
+Terminal Markdown & Mermaid Viewer for Termux.
+
+Options:
+  -w, --watch     Live reload watch mode (auto re-renders on file change)
+  -p, --pager     Always display output with pager (less -R)
+  -m, --mdcat     Render using mdcat (renders Mermaid diagrams in terminal)
+  -g, --glow      Render using glow (styled ANSI markdown)
+  -l, --lowdown   Render using lowdown (fast C-based ANSI renderer)
+  -h, --help      Show this help message
+
+Arguments:
+  [file.md]       Markdown file to render. Defaults to latest report (~/agent-viewer/latest.md).
+  -               Read Markdown from standard input.
+
+Examples:
+  tmd                     # View the latest agent report
+  tmd -w                  # Watch latest report live in terminal
+  tmd README.md           # Render README.md in terminal
+  tmd --glow README.md    # Force glow engine
+  echo "# Test" | tmd     # Render from pipe
+EOF
+}
+
+# Parse options
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      show_help
+      exit 0
+      ;;
+    -w|--watch)
+      WATCH_MODE=1
+      shift
+      ;;
+    -p|--pager)
+      PAGER_FLAG="1"
+      shift
+      ;;
+    -m|--mdcat)
+      ENGINE="mdcat"
+      shift
+      ;;
+    -g|--glow)
+      ENGINE="glow"
+      shift
+      ;;
+    -l|--lowdown)
+      ENGINE="lowdown"
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "Unknown option: $1" >&2
+      show_help >&2
+      exit 1
+      ;;
+    *)
+      if [ -z "$TARGET" ]; then
+        TARGET="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+# If no target specified
+if [ -z "$TARGET" ]; then
+  if [ ! -t 0 ]; then
+    TARGET="-"
+  elif [ -f "$DEFAULT_FILE" ]; then
+    TARGET="$DEFAULT_FILE"
+  else
+    echo "Error: No file specified and $DEFAULT_FILE does not exist." >&2
+    echo "Usage: tmd [file.md]" >&2
+    exit 1
+  fi
+fi
+
+# Detect engine if not explicitly chosen
+detect_engine() {
+  if [ -n "$ENGINE" ]; then
+    return 0
+  fi
+  if command -v mdcat >/dev/null 2>&1; then
+    ENGINE="mdcat"
+  elif command -v glow >/dev/null 2>&1; then
+    ENGINE="glow"
+  elif command -v lowdown >/dev/null 2>&1; then
+    ENGINE="lowdown"
+  else
+    ENGINE="cat"
+  fi
+}
+detect_engine
+
+render_once() {
+  local src="$1"
+  case "$ENGINE" in
+    mdcat)
+      if [ "$src" = "-" ]; then
+        mdcat
+      else
+        mdcat "$src"
+      fi
+      ;;
+    glow)
+      local cols
+      cols=$(tput cols 2>/dev/null || echo 80)
+      [ -z "$cols" ] || [ "$cols" -le 0 ] 2>/dev/null && cols=80
+      if [ "$src" = "-" ]; then
+        PAGER=cat glow - -s dark -w "$cols"
+      else
+        PAGER=cat glow "$src" -s dark -w "$cols" </dev/null
+      fi
+      ;;
+    lowdown)
+      if [ "$src" = "-" ]; then
+        lowdown -t term
+      else
+        lowdown -t term "$src"
+      fi
+      ;;
+    *)
+      if [ "$src" = "-" ]; then
+        cat
+      else
+        cat "$src"
+      fi
+      ;;
+  esac
+}
+
+# Watch mode
+if [ "$WATCH_MODE" -eq 1 ]; then
+  if [ "$TARGET" = "-" ]; then
+    echo "Error: Watch mode cannot be used with standard input." >&2
+    exit 1
+  fi
+  if [ ! -f "$TARGET" ]; then
+    echo "Error: File '$TARGET' not found." >&2
+    exit 1
+  fi
+
+  echo "Watching $TARGET (Press Ctrl+C to exit)..."
+  LAST_MTIME=""
+  while true; do
+    CUR_MTIME=$(stat -c %Y "$TARGET" 2>/dev/null || stat -f %m "$TARGET" 2>/dev/null || date +%s)
+    if [ "$CUR_MTIME" != "$LAST_MTIME" ]; then
+      clear 2>/dev/null || printf "\033c"
+      printf "\033[1;34m=== [tmd watch: %s (%s)] ===\033[0m\n\n" "$TARGET" "$(date +%T)"
+      render_once "$TARGET"
+      LAST_MTIME="$CUR_MTIME"
+    fi
+    sleep 1
+  done
+  exit 0
+fi
+
+# Pager decision:
+# If PAGER_FLAG is set, or if stdout is a terminal and output is long
+if [ "$PAGER_FLAG" = "1" ]; then
+  if [ "$TERM" != "dumb" ] && [ -n "$TERM" ]; then
+    render_once "$TARGET" | less -R
+  else
+    render_once "$TARGET"
+  fi
+elif [ -t 1 ] && [ "$TERM" != "dumb" ] && [ -n "$TERM" ] && [ "$PAGER" != "cat" ]; then
+  # Auto-pager with -F (quit if one screen) and -X (don't clear screen)
+  render_once "$TARGET" | less -R -F -X
+else
+  render_once "$TARGET"
+fi
