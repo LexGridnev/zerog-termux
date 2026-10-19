@@ -191,8 +191,8 @@ case "$CMD" in
     echo "✓ Snapshot exported to $TARGET"
     ;;
   web)
-    export_taskmgr_json "$HOME/agent-viewer/taskmgr.json" 2>/dev/null || true
     VIEWER_DIR="$HOME/agent-viewer"
+    "$VIEWER_DIR/update_meta.sh" >/dev/null 2>&1 || export_taskmgr_json "$VIEWER_DIR/taskmgr.json" 2>/dev/null || true
     PORT=8080
     URL="http://127.0.0.1:$PORT/?tab=tasks"
     if command -v termux-wake-lock >/dev/null 2>&1; then
@@ -200,12 +200,13 @@ case "$CMD" in
     fi
     if ! curl -s -o /dev/null -m 1 "http://127.0.0.1:$PORT/"; then
       echo "Starting darkhttpd on port $PORT..."
+      rm -f "$VIEWER_DIR/darkhttpd.pid"
       darkhttpd "$VIEWER_DIR" --port "$PORT" --daemon --pidfile "$VIEWER_DIR/darkhttpd.pid" --log "$VIEWER_DIR/darkhttpd.log"
       sleep 0.5
     fi
-    echo "Opening Task Manager dashboard at $URL"
-    if command -v termux-open-url >/dev/null 2>&1; then
-      termux-open-url "$URL"
+    echo "✓ ZeroG PWA Control Center active at: $URL"
+    if [ "${BROWSER_DRY_RUN:-0}" != "1" ] && command -v termux-open-url >/dev/null 2>&1; then
+      termux-open-url "$URL" 2>/dev/null || true
     fi
     ;;
   -h|--help|help|"")
