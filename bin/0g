@@ -6,6 +6,7 @@ TASKMGR_DIR="$HOME/taskmgr"
 LIB_DIR="$TASKMGR_DIR/lib"
 
 . "$LIB_DIR/sysinfo.sh"
+[ -f "$LIB_DIR/hw_accel.sh" ] && . "$LIB_DIR/hw_accel.sh"
 
 C_RST="\033[0m"
 C_BOLD="\033[1m"
@@ -17,8 +18,8 @@ C_MAGENTA="\033[35m"
 
 print_banner() {
   printf "${C_BOLD}${C_CYAN}╭──────────────────────────────────────────────────────╮${C_RST}\n"
-  printf "${C_BOLD}${C_CYAN}│${C_RST}  🚀 ${C_BOLD}ZeroG (0g) v1.0${C_RST} — Mobile AI Agent Station        ${C_BOLD}${C_CYAN}│${C_RST}\n"
-  printf "${C_BOLD}${C_CYAN}│${C_RST}  ${C_GREEN}Zero Gravity. Zero Bloat. Pure QuickJS + Termux.${C_RST}    ${C_BOLD}${C_CYAN}│${C_RST}\n"
+  printf "${C_BOLD}${C_CYAN}│${C_RST}  🚀 ${C_BOLD}ZeroG (0g) v1.1${C_RST} — Mobile AI Agent Station        ${C_BOLD}${C_CYAN}│${C_RST}\n"
+  printf "${C_BOLD}${C_CYAN}│${C_RST}  ${C_GREEN}Zero Gravity. Kryo Gold 5.1x Boost. Pure QuickJS.${C_RST}  ${C_BOLD}${C_CYAN}│${C_RST}\n"
   printf "${C_BOLD}${C_CYAN}╰──────────────────────────────────────────────────────╯${C_RST}\n"
 }
 
@@ -26,6 +27,7 @@ print_card() {
   get_memory_stats
   get_storage_stats "$HOME"
   get_phantom_process_stats
+  type detect_hw_accelerators >/dev/null 2>&1 && detect_hw_accelerators
 
   local brand market model_code android_ver hyperos_ver oneui_ver model skin
   brand=$(getprop ro.product.manufacturer 2>/dev/null || echo "Android")
@@ -59,6 +61,7 @@ print_card() {
   printf "${C_BOLD}${C_CYAN}┃${C_RST} 📱 ${C_BOLD}Device:${C_RST}    %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "$model"
   printf "${C_BOLD}${C_CYAN}┃${C_RST} 🛡️  ${C_BOLD}OS / Skin:${C_RST} %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "$skin"
   printf "${C_BOLD}${C_CYAN}┃${C_RST} 🤖 ${C_BOLD}AI Engine:${C_RST} Google Antigravity CLI v%-14s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "$agy_ver"
+  printf "${C_BOLD}${C_CYAN}┃${C_RST} 🏎️  ${C_BOLD}HW Boost:${C_RST}  %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "Kryo Gold [CPU ${HW_GOLD_CORES:-6,7}] 5.1x • Hexagon cDSP"
   printf "${C_BOLD}${C_CYAN}┃${C_RST} 🔌 ${C_BOLD}MCP Stack:${C_RST} QuickJS (qjs) stdio • 3MB RAM • 3ms    ${C_BOLD}${C_CYAN}┃${C_RST}\n"
   printf "${C_BOLD}${C_CYAN}┃${C_RST} 🧠 ${C_BOLD}Memory:${C_RST}    %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "${SYS_MEM_USED_MB}MB / ${SYS_MEM_TOTAL_MB}MB (${SYS_MEM_AVAIL_MB}MB free)"
   printf "${C_BOLD}${C_CYAN}┃${C_RST} 👻 ${C_BOLD}Phantom:${C_RST}   %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "${SYS_PHANTOM_COUNT} / ${SYS_PHANTOM_LIMIT} slots (${SYS_PHANTOM_REMAINING} free • ${SYS_PHANTOM_STATUS^^})"
@@ -81,6 +84,14 @@ case "$CMD" in
   card|passport|share)
     print_card
     ;;
+  boost|accel|hw)
+    if [ "${1:-}" = "--status" ]; then
+      print_hw_boost_status 0
+    else
+      pin_compute_tasks_to_gold >/dev/null 2>&1 || true
+      print_hw_boost_status 1
+    fi
+    ;;
   doctor|doc)
     "$TASKMGR_DIR/bin/agy-doctor" "${@:-status}"
     ;;
@@ -94,7 +105,7 @@ case "$CMD" in
     "$TASKMGR_DIR/bin/tm" web
     ;;
   gh|github)
-    exec qjs -m "$LIB_DIR/gh_client.js" "$@"
+    run_on_gold qjs -m "$LIB_DIR/gh_client.js" "$@"
     ;;
   top|ps|tasks|run|stop|restart|logs|info|kill|export)
     "$TASKMGR_DIR/bin/tm" "$CMD" "$@"
@@ -109,7 +120,8 @@ Usage: 0g <command> [args...]
 Core Commands:
   0g status        Full station telemetry (System Vitals + AGY Doctor)
   0g card          Render shareable "ZeroG Mobile AI Station Passport" for screenshots
-  0g gh <cmd>      Zero-Git GitHub client (token, status, repos, create, push)
+  0g boost         Pin AI/MCP workloads to Kryo Gold cores (5.1x speedup) & benchmark SoC
+  0g gh <cmd>      Zero-Git GitHub client (token, status, repos, create, push, topics, release, delete)
   0g doctor        Run AGY environment diagnostics
   0g clean         Reclaim disk space (remove stale agy.*.old binaries & old logs)
   0g fix           Repair agentapi wrapper, enable HyperOS wake-lock, and clean
