@@ -1,0 +1,125 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# 0g (ZeroG) — Unified CLI for Termux + Google Antigravity Mobile AI Station
+set -e
+
+TASKMGR_DIR="$HOME/taskmgr"
+LIB_DIR="$TASKMGR_DIR/lib"
+
+. "$LIB_DIR/sysinfo.sh"
+
+C_RST="\033[0m"
+C_BOLD="\033[1m"
+C_CYAN="\033[36m"
+C_GREEN="\033[32m"
+C_BLUE="\033[34m"
+C_YELLOW="\033[33m"
+C_MAGENTA="\033[35m"
+
+print_banner() {
+  printf "${C_BOLD}${C_CYAN}╭──────────────────────────────────────────────────────╮${C_RST}\n"
+  printf "${C_BOLD}${C_CYAN}│${C_RST}  🚀 ${C_BOLD}ZeroG (0g) v1.0${C_RST} — Mobile AI Agent Station        ${C_BOLD}${C_CYAN}│${C_RST}\n"
+  printf "${C_BOLD}${C_CYAN}│${C_RST}  ${C_GREEN}Zero Gravity. Zero Bloat. Pure QuickJS + Termux.${C_RST}    ${C_BOLD}${C_CYAN}│${C_RST}\n"
+  printf "${C_BOLD}${C_CYAN}╰──────────────────────────────────────────────────────╯${C_RST}\n"
+}
+
+print_card() {
+  get_memory_stats
+  get_storage_stats "$HOME"
+  get_phantom_process_stats
+
+  local brand market model_code android_ver hyperos_ver oneui_ver model skin
+  brand=$(getprop ro.product.manufacturer 2>/dev/null || echo "Android")
+  market=$(getprop ro.product.marketname 2>/dev/null || true)
+  model_code=$(getprop ro.product.model 2>/dev/null || echo "Device")
+  if [ -n "$market" ]; then
+    model="$market ($model_code)"
+  else
+    model="$brand $model_code"
+  fi
+
+  android_ver=$(getprop ro.build.version.release 2>/dev/null || echo "Unknown")
+  hyperos_ver=$(getprop ro.mi.os.version.name 2>/dev/null || true)
+  oneui_ver=$(getprop ro.build.version.oneui 2>/dev/null || true)
+  if [ -n "$hyperos_ver" ]; then
+    skin="$brand HyperOS ${hyperos_ver#OS} (Android $android_ver)"
+  elif [ -n "$oneui_ver" ]; then
+    skin="Samsung OneUI $oneui_ver (Android $android_ver)"
+  else
+    skin="Android $android_ver ($(uname -m))"
+  fi
+
+  local agy_ver
+  agy_ver=$("$TASKMGR_DIR/bin/agy-doctor" json 2>/dev/null | awk -F'"' '/"agy_version"/{print $4}')
+  [ -z "$agy_ver" ] && agy_ver="1.4.2"
+
+  printf "\n"
+  printf "${C_BOLD}${C_CYAN}┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${C_RST}\n"
+  printf "${C_BOLD}${C_CYAN}┃${C_RST} ⚡ ${C_BOLD}ZEROG MOBILE AI STATION PASSPORT${C_RST}                  ${C_BOLD}${C_CYAN}┃${C_RST}\n"
+  printf "${C_BOLD}${C_CYAN}┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫${C_RST}\n"
+  printf "${C_BOLD}${C_CYAN}┃${C_RST} 📱 ${C_BOLD}Device:${C_RST}    %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "$model"
+  printf "${C_BOLD}${C_CYAN}┃${C_RST} 🛡️  ${C_BOLD}OS / Skin:${C_RST} %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "$skin"
+  printf "${C_BOLD}${C_CYAN}┃${C_RST} 🤖 ${C_BOLD}AI Engine:${C_RST} Google Antigravity CLI v%-14s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "$agy_ver"
+  printf "${C_BOLD}${C_CYAN}┃${C_RST} 🔌 ${C_BOLD}MCP Stack:${C_RST} QuickJS (qjs) stdio • 3MB RAM • 3ms    ${C_BOLD}${C_CYAN}┃${C_RST}\n"
+  printf "${C_BOLD}${C_CYAN}┃${C_RST} 🧠 ${C_BOLD}Memory:${C_RST}    %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "${SYS_MEM_USED_MB}MB / ${SYS_MEM_TOTAL_MB}MB (${SYS_MEM_AVAIL_MB}MB free)"
+  printf "${C_BOLD}${C_CYAN}┃${C_RST} 👻 ${C_BOLD}Phantom:${C_RST}   %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "${SYS_PHANTOM_COUNT} / ${SYS_PHANTOM_LIMIT} slots (${SYS_PHANTOM_REMAINING} free • ${SYS_PHANTOM_STATUS^^})"
+  printf "${C_BOLD}${C_CYAN}┃${C_RST} 💾 ${C_BOLD}Storage:${C_RST}   %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "${SYS_DISK_USED} / ${SYS_DISK_TOTAL} (${SYS_DISK_AVAIL} avail)"
+  printf "${C_BOLD}${C_CYAN}┃${C_RST} 🌐 ${C_BOLD}PWA Hub:${C_RST}   http://127.0.0.1:8080 (Offline Ready)  ${C_BOLD}${C_CYAN}┃${C_RST}\n"
+  printf "${C_BOLD}${C_CYAN}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${C_RST}\n\n"
+}
+
+CMD="${1:-status}"
+shift || true
+
+case "$CMD" in
+  status|st)
+    print_banner
+    echo ""
+    "$TASKMGR_DIR/bin/tm" sys
+    echo ""
+    "$TASKMGR_DIR/bin/agy-doctor" status
+    ;;
+  card|passport|share)
+    print_card
+    ;;
+  doctor|doc)
+    "$TASKMGR_DIR/bin/agy-doctor" "${@:-status}"
+    ;;
+  clean)
+    "$TASKMGR_DIR/bin/agy-doctor" clean
+    ;;
+  fix)
+    "$TASKMGR_DIR/bin/agy-doctor" fix
+    ;;
+  web|ui|pwa)
+    "$TASKMGR_DIR/bin/tm" web
+    ;;
+  gh|github)
+    exec qjs -m "$LIB_DIR/gh_client.js" "$@"
+    ;;
+  top|ps|tasks|run|stop|restart|logs|info|kill|export)
+    "$TASKMGR_DIR/bin/tm" "$CMD" "$@"
+    ;;
+  -h|--help|help)
+    print_banner
+    cat << 'EOF'
+
+Usage: 0g <command> [args...]
+       zerog <command> [args...]
+
+Core Commands:
+  0g status        Full station telemetry (System Vitals + AGY Doctor)
+  0g card          Render shareable "ZeroG Mobile AI Station Passport" for screenshots
+  0g gh <cmd>      Zero-Git GitHub client (token, status, repos, create, push)
+  0g doctor        Run AGY environment diagnostics
+  0g clean         Reclaim disk space (remove stale agy.*.old binaries & old logs)
+  0g fix           Repair agentapi wrapper, enable HyperOS wake-lock, and clean
+  0g web           Launch & open Offline PWA Control Center (:8080)
+  0g top           Live terminal process & Phantom Killer dashboard
+  0g ps [filter]   List or filter processes
+  0g tasks         List supervised background tasks
+EOF
+    ;;
+  *)
+    "$TASKMGR_DIR/bin/tm" "$CMD" "$@"
+    ;;
+esac
