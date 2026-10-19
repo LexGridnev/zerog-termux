@@ -165,19 +165,21 @@ EOF
 }
 
 print_status() {
-  local ver
+  local ver dev_name
   ver=$(get_agy_version)
+  dev_name=$(getprop ro.product.marketname 2>/dev/null || true)
+  [ -z "$dev_name" ] && dev_name="$(getprop ro.product.manufacturer 2>/dev/null || echo 'Android') $(getprop ro.product.model 2>/dev/null || echo 'Device')"
   get_old_binaries_stats
   get_gemini_stats
   check_agentapi_status
   enable_hyperos_shield
 
-  printf "\033[1;34m=== [AGY Doctor — POCO X4 Pro Health & Optimization] ===\033[0m\n"
+  printf "\033[1;34m=== [AGY Doctor — %s Health & Optimization] ===\033[0m\n" "$dev_name"
   printf "• \033[1mAGY CLI Version:\033[0m      %s\n" "$ver"
   printf "• \033[1m.gemini Footprint:\033[0m    %d MB (%d conversations in brain)\n" "$GEMINI_MB" "$CONV_COUNT"
   printf "• \033[1mStale Binaries (.old):\033[0m %d file(s) (%d MB reclaimable)\n" "$OLD_COUNT" "$OLD_MB"
   printf "• \033[1magentapi Wrapper:\033[0m     %s\n" "$AGENTAPI_STATUS"
-  printf "• \033[1mHyperOS Shield:\033[0m       %s\n" "$SHIELD_STATUS"
+  printf "• \033[1mZeroG Wake Shield:\033[0m    %s\n" "$SHIELD_STATUS"
 }
 
 CMD="${1:-status}"
@@ -202,10 +204,10 @@ case "$CMD" in
 Usage: agy-doctor [status|clean|fix|json]
 
 Commands:
-  status    Show Antigravity & POCO health diagnostics
+  status    Show Antigravity & ZeroG Android health diagnostics
   clean     Remove stale agy.*.old binaries, crash dumps, and old logs
-  fix       Repair agentapi wrapper, enable HyperOS wake-lock, and run clean
-  json      Output health metrics as JSON for Agent Viewer
+  fix       Repair agentapi wrapper, enable wake-lock, and run clean
+  json      Output health metrics as JSON for ZeroG PWA Control Center
 EOF
     ;;
   *)
