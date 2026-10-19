@@ -120,6 +120,21 @@ const TOOLS = [
       properties: {},
       additionalProperties: false
     }
+  },
+  {
+    name: "poco_hw_boost",
+    description:
+      "Inspect and activate POCO SoC hardware acceleration (Snapdragon Kryo 660 Gold Cortex-A78 cluster pinning, Hexagon 686 cDSP/NPU status, Adreno 619 OpenCL/Vulkan drivers, ARMv8.2 asimddp DotProd) and run a live Silver vs Gold speedup benchmark.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        benchmark: {
+          type: "boolean",
+          description: "Set true to run a live Silver vs Gold core speedup benchmark"
+        }
+      },
+      additionalProperties: false
+    }
   }
 ];
 
@@ -230,6 +245,14 @@ function executeTool(name, args) {
             )
           }
         ],
+        isError: false
+      };
+    }
+    case "poco_hw_boost": {
+      const flag = a.benchmark ? "" : "--status";
+      const out = runCommand(`"${HOME}/taskmgr/bin/0g" boost ${flag}`);
+      return {
+        content: [{ type: "text", text: out }],
         isError: false
       };
     }
