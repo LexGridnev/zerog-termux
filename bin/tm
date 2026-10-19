@@ -1,0 +1,220 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# tm - Full-fledged Task Manager for Termux
+# Manages processes, monitors Android Phantom Process limit, and supervises background tasks.
+
+set -e
+
+TASKMGR_DIR="$HOME/taskmgr"
+LIB_DIR="$TASKMGR_DIR/lib"
+
+. "$LIB_DIR/sysinfo.sh"
+. "$LIB_DIR/procinfo.sh"
+. "$LIB_DIR/supervisor.sh"
+. "$LIB_DIR/api_exporter.sh"
+
+show_help() {
+  cat << 'EOF'
+Usage: tm <command> [arguments...]
+       taskmgr <command> [arguments...]
+
+Full-fledged Task & Process Manager for Termux.
+
+System & Process Commands:
+  tm sys                       Show system vitals (RAM, Disk, Phantom Process Killer)
+  tm ps [filter] [--sort S]    List processes (sort: cpu, mem, pid)
+  tm top [--once]              Interactive / live process dashboard
+  tm info <PID>                Detailed inspection of a process
+  tm kill <PID> [SIGNAL]       Safely terminate a process (guarded)
+
+Supervised Background Tasks:
+  tm run <name> -- <cmd>       Run a background task with logging & supervision
+  tm tasks                     List all supervised background tasks
+  tm logs <name> [-f]          View or follow logs for a task
+  tm stop <name>               Stop a running background task
+  tm restart <name>            Restart a background task
+  tm rm <name>                 Remove a task from registry
+
+Web Dashboard & Export:
+  tm export [file.json]        Export live state to JSON (default: ~/agent-viewer/taskmgr.json)
+  tm web                       Open web dashboard in Android browser
+
+Examples:
+  tm sys                       # Check Phantom Process Killer limit (N / 32)
+  tm ps node                   # Find node processes
+  tm run worker -- 'sleep 60'  # Supervise background task
+  tm top                       # Live dashboard in terminal
+EOF
+}
+
+CMD="$1"
+shift || true
+
+case "$CMD" in
+  sys|system)
+    print_system_summary
+    ;;
+  ps|list)
+    SORT_KEY="cpu"
+    QUERY=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --sort)
+          SORT_KEY="$2"
+          shift 2
+          ;;
+        --sort=*)
+          SORT_KEY="${1#*=}"
+          shift
+          ;;
+        *)
+          QUERY="$1"
+          shift
+          ;;
+      esac
+    done
+    if [ -n "$QUERY" ]; then
+      filter_processes "$QUERY"
+    else
+      sort_processes "$SORT_KEY"
+    fi
+    ;;
+  top|monitor)
+    ONCE=0
+    [ "$1" = "--once" ] && ONCE=1
+    # Check if dumb terminal or non-interactive
+    if [ "$ONCE" -eq 1 ] || [ ! -t 1 ] || [ "$TERM" = "dumb" ] || [ -z "$TERM" ] || [ "$PAGER" = "cat" ]; then
+      print_system_summary
+      echo ""
+      supervisor_list_jobs
+      echo ""
+      sort_processes "cpu" | head -n 15
+      exit 0
+    fi
+
+    # Interactive live loop
+    trap 'printf "\033[?25h\n"; exit 0' INT TERM
+    printf "\033[?25l" # Hide cursor
+    while true; do
+      clear 2>/dev/null || printf "\033c"
+      print_system_summary
+      echo ""
+      echo "=== [Supervised Background Tasks] ==="
+      supervisor_list_jobs
+      echo ""
+      echo "=== [Top Processes by CPU] (Press Ctrl+C to exit) ==="
+      sort_processes "cpu" | head -n 20
+      sleep 2
+    done
+    ;;
+  info)
+    if [ -z "$1" ]; then
+      echo "Usage: tm info <PID>" >&2
+      exit 1
+    fi
+    get_process_info "$1"
+    ;;
+  kill|terminate)
+    if [ -z "$1" ]; then
+      echo "Usage: tm kill <PID> [SIGNAL]" >&2
+      exit 1
+    fi
+    safe_kill_process "$1" "${2:-TERM}"
+    ;;
+  run|start)
+    NAME="$1"
+    shift || true
+    if [ "$1" = "--" ]; then
+      shift
+    fi
+    CMD_STR="$*"
+    if [ -z "$NAME" ] || [ -z "$CMD_STR" ]; then
+      echo "Usage: tm run <name> -- <command>" >&2
+      exit 1
+    fi
+    JOB_ID=$(supervisor_run "$NAME" "$CMD_STR")
+    echo "✓ Task '$JOB_ID' started in background. Logs: ~/taskmgr/state/logs/$NAME.log"
+    # Export state to agent-viewer
+    export_taskmgr_json "$HOME/agent-viewer/taskmgr.json" 2>/dev/null || true
+    ;;
+  tasks|jobs)
+    supervisor_list_jobs
+    ;;
+  logs)
+    if [ -z "$1" ]; then
+      echo "Usage: tm logs <task_name> [-f]" >&2
+      exit 1
+    fi
+    NAME="$1"
+    FOLLOW=0
+    [ "$2" = "-f" ] && FOLLOW=1
+    LOG_FILE="$TASKMGR_DIR/state/logs/$NAME.log"
+    if [ ! -f "$LOG_FILE" ]; then
+      echo "Error: Log file for task '$NAME' not found." >&2
+      exit 1
+    fi
+    if [ "$FOLLOW" -eq 1 ]; then
+      tail -f "$LOG_FILE"
+    else
+      supervisor_get_logs "$NAME"
+    fi
+    ;;
+  stop)
+    if [ -z "$1" ]; then
+      echo "Usage: tm stop <task_name>" >&2
+      exit 1
+    fi
+    supervisor_stop "$1"
+    echo "✓ Task '$1' stopped."
+    export_taskmgr_json "$HOME/agent-viewer/taskmgr.json" 2>/dev/null || true
+    ;;
+  restart)
+    if [ -z "$1" ]; then
+      echo "Usage: tm restart <task_name>" >&2
+      exit 1
+    fi
+    supervisor_restart "$1"
+    echo "✓ Task '$1' restarted."
+    export_taskmgr_json "$HOME/agent-viewer/taskmgr.json" 2>/dev/null || true
+    ;;
+  rm|delete)
+    if [ -z "$1" ]; then
+      echo "Usage: tm rm <task_name>" >&2
+      exit 1
+    fi
+    supervisor_delete "$1"
+    echo "✓ Task '$1' removed."
+    export_taskmgr_json "$HOME/agent-viewer/taskmgr.json" 2>/dev/null || true
+    ;;
+  export)
+    TARGET="${1:-$HOME/agent-viewer/taskmgr.json}"
+    export_taskmgr_json "$TARGET"
+    echo "✓ Snapshot exported to $TARGET"
+    ;;
+  web)
+    export_taskmgr_json "$HOME/agent-viewer/taskmgr.json" 2>/dev/null || true
+    VIEWER_DIR="$HOME/agent-viewer"
+    PORT=8080
+    URL="http://127.0.0.1:$PORT/?tab=tasks"
+    if command -v termux-wake-lock >/dev/null 2>&1; then
+      termux-wake-lock 2>/dev/null || true
+    fi
+    if ! curl -s -o /dev/null -m 1 "http://127.0.0.1:$PORT/"; then
+      echo "Starting darkhttpd on port $PORT..."
+      darkhttpd "$VIEWER_DIR" --port "$PORT" --daemon --pidfile "$VIEWER_DIR/darkhttpd.pid" --log "$VIEWER_DIR/darkhttpd.log"
+      sleep 0.5
+    fi
+    echo "Opening Task Manager dashboard at $URL"
+    if command -v termux-open-url >/dev/null 2>&1; then
+      termux-open-url "$URL"
+    fi
+    ;;
+  -h|--help|help|"")
+    show_help
+    exit 0
+    ;;
+  *)
+    echo "Unknown command: $CMD" >&2
+    show_help >&2
+    exit 1
+    ;;
+esac
