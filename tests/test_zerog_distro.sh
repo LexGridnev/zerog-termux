@@ -36,6 +36,7 @@ for f in \
   "lib/jobs_db.js" \
   "lib/api_exporter.sh" \
   "lib/gh_client.js" \
+  "lib/hw_accel.sh" \
   "mcp/server.js" \
   "viewer/index.html" \
   "viewer/manifest.json" \
@@ -59,6 +60,7 @@ for shf in \
   "$REPO_DIR/lib/procinfo.sh" \
   "$REPO_DIR/lib/supervisor.sh" \
   "$REPO_DIR/lib/api_exporter.sh" \
+  "$REPO_DIR/lib/hw_accel.sh" \
   "$REPO_DIR/viewer/hook.sh" \
   "$REPO_DIR/viewer/update_meta.sh"; do
   assert_ok "bash -n '$shf'" "Valid bash syntax: $(basename "$shf")"
@@ -72,6 +74,13 @@ assert_ok "echo \"\$PROBE_JSON\" | grep -q '\"phantom_limit\"'" "device-probe.sh
 
 # Ensure no secrets or tokens exist inside the repo directory
 assert_ok "! grep -rnI -E 'ghp_[A-Za-z0-9]{20,}' '$REPO_DIR' >/dev/null 2>&1" "Zero secrets/tokens leaked in repository files"
+
+# Universal product readiness checks (No hardcoded POCO X4 Pro in UI/Doctor, curl|bash bootstrap, README benchmarks)
+assert_ok "! grep -q 'POCO X4 Pro' '$REPO_DIR/bin/agy-doctor'" "bin/agy-doctor uses dynamic device model instead of hardcoded POCO X4 Pro"
+assert_ok "! grep -q 'POCO' '$REPO_DIR/viewer/manifest.json'" "viewer/manifest.json uses universal ZeroG branding"
+assert_ok "grep -q 'tarball' '$REPO_DIR/install.sh'" "install.sh supports standalone curl | bash remote tarball bootstrap"
+assert_ok "grep -q '0g boost' '$REPO_DIR/README.md'" "README.md documents 0g boost 5.17x Kryo Gold hardware acceleration"
+assert_ok "grep -q 'adb-manager-mcp' '$REPO_DIR/README.md'" "README.md cross-links adb-manager-mcp v2.0 ecosystem"
 
 echo "------------------------------------------------------------"
 echo "ZeroG Repo Distribution Tests: Passed: $PASS | Failed: $FAIL"
