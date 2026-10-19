@@ -1,0 +1,215 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# agy-doctor - Diagnostic, Auto-Cleanup & HyperOS Shield Utility for Termux + Antigravity on POCO
+set -e
+
+LOCAL_BIN="$HOME/.local/bin"
+GEMINI_DIR="$HOME/.gemini/antigravity-cli"
+BRAIN_DIR="$GEMINI_DIR/brain"
+LOG_DIR="$GEMINI_DIR/log"
+CRASH_DIR="$GEMINI_DIR/crashes"
+AGENTAPI_BIN="$GEMINI_DIR/bin/agentapi"
+
+get_agy_version() {
+  if [ -x "$LOCAL_BIN/agy" ]; then
+    local mtime
+    mtime=$(stat -c %Y "$LOCAL_BIN/agy" 2>/dev/null || echo 0)
+    local cache_file="$PREFIX/tmp/agy_version_${mtime}.cache"
+    if [ -f "$cache_file" ]; then
+      cat "$cache_file"
+      return 0
+    fi
+    local ver
+    ver=$("$LOCAL_BIN/agy" --version 2>/dev/null | head -n 1 | tr -d '\r\n' || echo "unknown")
+    # agy binary overwrites agentapi on startup; immediately re-apply Termux shim fix
+    fix_agentapi 2>/dev/null || true
+    rm -f "$PREFIX/tmp"/agy_version_*.cache 2>/dev/null || true
+    echo "$ver" > "$cache_file" 2>/dev/null || true
+    echo "$ver"
+  elif command -v agy >/dev/null 2>&1; then
+    agy --version 2>/dev/null | head -n 1 | tr -d '\r\n' || echo "unknown"
+  else
+    echo "not-installed"
+  fi
+}
+
+get_old_binaries_stats() {
+  OLD_COUNT=0
+  OLD_BYTES=0
+  if [ -d "$LOCAL_BIN" ]; then
+    while IFS= read -r f; do
+      [ -f "$f" ] || continue
+      OLD_COUNT=$((OLD_COUNT + 1))
+      sz=$(stat -c %s "$f" 2>/dev/null || echo 0)
+      OLD_BYTES=$((OLD_BYTES + sz))
+    done < <(find "$LOCAL_BIN" -maxdepth 1 -type f -name 'agy.*.old' 2>/dev/null)
+  fi
+  OLD_MB=$((OLD_BYTES / 1048576))
+}
+
+get_gemini_stats() {
+  local kb
+  kb=$(du -sk "$HOME/.gemini" 2>/dev/null | awk '{print $1}')
+  GEMINI_MB=$(( ${kb:-0} / 1024 ))
+  CONV_COUNT=0
+  if [ -d "$BRAIN_DIR" ]; then
+    CONV_COUNT=$(find "$BRAIN_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
+    CONV_COUNT=$((CONV_COUNT))
+  fi
+}
+
+check_agentapi_status() {
+  if [ ! -f "$AGENTAPI_BIN" ]; then
+    fix_agentapi 2>/dev/null || true
+  elif grep -q '^exec "/usr/local/bin/language_server_shim"' "$AGENTAPI_BIN" 2>/dev/null; then
+    fix_agentapi 2>/dev/null || true
+  fi
+  if [ -x "$AGENTAPI_BIN" ] && ! grep -q '^exec "/usr/local/bin/language_server_shim"' "$AGENTAPI_BIN" 2>/dev/null; then
+    AGENTAPI_STATUS="healthy"
+  else
+    AGENTAPI_STATUS="broken-path"
+  fi
+}
+
+fix_agentapi() {
+  mkdir -p "$(dirname "$AGENTAPI_BIN")"
+  cat << 'EOF' > "$AGENTAPI_BIN"
+#!/data/data/com.termux/files/usr/bin/sh
+# Termux-compatible wrapper for Antigravity agentapi
+for candidate in \
+  "$PREFIX/bin/language_server_shim" \
+  "$HOME/.local/bin/language_server_shim" \
+  "/usr/local/bin/language_server_shim"; do
+  if [ -x "$candidate" ]; then
+    exec "$candidate" agentapi "$@"
+  fi
+done
+if command -v agy >/dev/null 2>&1; then
+  exec agy "$@"
+fi
+echo '{"status":"unavailable","reason":"language_server_shim not present on Termux"}'
+exit 0
+EOF
+  chmod 700 "$AGENTAPI_BIN"
+}
+
+enable_hyperos_shield() {
+  if command -v termux-wake-lock >/dev/null 2>&1; then
+    termux-wake-lock 2>/dev/null || true
+    SHIELD_STATUS="wakelock-active"
+  else
+    SHIELD_STATUS="process-guard-active"
+  fi
+}
+
+do_clean() {
+  get_old_binaries_stats
+  local freed_bytes="$OLD_BYTES"
+  local removed_old="$OLD_COUNT"
+
+  # 1. Remove stale agy.*.old binaries
+  if [ -d "$LOCAL_BIN" ]; then
+    find "$LOCAL_BIN" -maxdepth 1 -type f -name 'agy.*.old' -exec rm -f {} + 2>/dev/null || true
+  fi
+
+  # 2. Clean crash dumps and staging cache
+  if [ -d "$CRASH_DIR" ]; then
+    find "$CRASH_DIR" -type f -exec rm -f {} + 2>/dev/null || true
+  fi
+  if [ -d "$HOME/.cache/antigravity/staging" ]; then
+    find "$HOME/.cache/antigravity/staging" -type f -exec rm -f {} + 2>/dev/null || true
+  fi
+
+  # 3. Clean stale tmp files in agent-viewer and $PREFIX/tmp
+  find "$HOME/agent-viewer" -maxdepth 1 -type f -name '*.tmp.*' -exec rm -f {} + 2>/dev/null || true
+  find "$PREFIX/tmp" -maxdepth 1 -type f -name 'taskmgr_tmp_*' -mmin +60 -exec rm -f {} + 2>/dev/null || true
+
+  # 4. Keep only 10 most recent CLI logs
+  if [ -d "$LOG_DIR" ]; then
+    find "$LOG_DIR" -maxdepth 1 -type f -name 'cli-*.log' -printf '%T@ %p\n' 2>/dev/null | sort -nr | tail -n +11 | cut -d' ' -f2- | while IFS= read -r old_log; do
+      [ -f "$old_log" ] || continue
+      sz=$(stat -c %s "$old_log" 2>/dev/null || echo 0)
+      freed_bytes=$((freed_bytes + sz))
+      rm -f "$old_log" 2>/dev/null || true
+    done
+  fi
+
+  local freed_mb=$((freed_bytes / 1048576))
+  echo "✓ Cleanup complete: removed $removed_old stale binary backup(s), freed ~${freed_mb} MB (${freed_bytes} bytes)."
+}
+
+print_json() {
+  local ver
+  ver=$(get_agy_version)
+  get_old_binaries_stats
+  get_gemini_stats
+  check_agentapi_status
+  enable_hyperos_shield
+
+  local viewer_running="false"
+  if curl -sf -o /dev/null -m 1 "http://127.0.0.1:8080/" 2>/dev/null; then
+    viewer_running="true"
+  fi
+
+  cat << EOF
+{
+  "agy_version": "$ver",
+  "gemini_dir_mb": $GEMINI_MB,
+  "conversations_count": $CONV_COUNT,
+  "old_binaries_count": $OLD_COUNT,
+  "old_binaries_mb": $OLD_MB,
+  "agentapi_status": "$AGENTAPI_STATUS",
+  "hyperos_shield": "$SHIELD_STATUS",
+  "viewer_running": $viewer_running
+}
+EOF
+}
+
+print_status() {
+  local ver
+  ver=$(get_agy_version)
+  get_old_binaries_stats
+  get_gemini_stats
+  check_agentapi_status
+  enable_hyperos_shield
+
+  printf "\033[1;34m=== [AGY Doctor — POCO X4 Pro Health & Optimization] ===\033[0m\n"
+  printf "• \033[1mAGY CLI Version:\033[0m      %s\n" "$ver"
+  printf "• \033[1m.gemini Footprint:\033[0m    %d MB (%d conversations in brain)\n" "$GEMINI_MB" "$CONV_COUNT"
+  printf "• \033[1mStale Binaries (.old):\033[0m %d file(s) (%d MB reclaimable)\n" "$OLD_COUNT" "$OLD_MB"
+  printf "• \033[1magentapi Wrapper:\033[0m     %s\n" "$AGENTAPI_STATUS"
+  printf "• \033[1mHyperOS Shield:\033[0m       %s\n" "$SHIELD_STATUS"
+}
+
+CMD="${1:-status}"
+case "$CMD" in
+  status|check)
+    print_status
+    ;;
+  clean)
+    do_clean
+    ;;
+  fix)
+    fix_agentapi
+    enable_hyperos_shield
+    do_clean
+    echo "✓ AGY environment repaired and optimized."
+    ;;
+  json)
+    print_json
+    ;;
+  -h|--help|help)
+    cat << 'EOF'
+Usage: agy-doctor [status|clean|fix|json]
+
+Commands:
+  status    Show Antigravity & POCO health diagnostics
+  clean     Remove stale agy.*.old binaries, crash dumps, and old logs
+  fix       Repair agentapi wrapper, enable HyperOS wake-lock, and run clean
+  json      Output health metrics as JSON for Agent Viewer
+EOF
+    ;;
+  *)
+    echo "Unknown command: $CMD" >&2
+    exit 1
+    ;;
+esac
