@@ -159,7 +159,8 @@ const RESOURCES = [
   }
 ];
 
-function executeTool(name, args) {
+function executeTool(rawName, args) {
+  const name = String(rawName || "").replace(/^zerog_/, "poco_");
   const a = args || {};
   switch (name) {
     case "poco_system_vitals": {
