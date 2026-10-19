@@ -1,3 +1,10 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# poco-mcp - Native QuickJS MCP Server Launcher for Antigravity on Termux
+# poco-mcp — Native QuickJS MCP Server Launcher (Pinned to Kryo Gold Cortex-A78 Cluster)
+if [ -f "$HOME/taskmgr/lib/hw_accel.sh" ]; then
+  . "$HOME/taskmgr/lib/hw_accel.sh"
+  detect_hw_accelerators
+  if command -v taskset >/dev/null 2>&1 && [ -n "$HW_GOLD_CORES" ]; then
+    exec taskset -c "$HW_GOLD_CORES" qjs -m "$HOME/poco-mcp/server.js" "$@"
+  fi
+fi
 exec qjs -m "$HOME/poco-mcp/server.js" "$@"
