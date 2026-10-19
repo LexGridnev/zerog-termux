@@ -1,7 +1,7 @@
 {
-  "name": "Antigravity Control Center — POCO",
-  "short_name": "AGY Hub",
-  "description": "Offline PWA Dashboard, Markdown & Mermaid Viewer, and Task Manager for Termux + Antigravity on POCO X4 Pro",
+  "name": "ZeroG Control Center — Antigravity Mobile AI Hub",
+  "short_name": "ZeroG Hub",
+  "description": "Offline PWA Dashboard, Markdown & Mermaid Viewer, and Phantom Process Supervisor for Google Antigravity CLI on Android Termux",
   "start_url": "/?source=pwa",
   "display": "standalone",
   "background_color": "#0d1117",
