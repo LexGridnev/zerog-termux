@@ -67,14 +67,43 @@ print_card() {
   printf "${C_BOLD}${C_CYAN}┃${C_RST} 👻 ${C_BOLD}Phantom:${C_RST}   %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "${SYS_PHANTOM_COUNT} / ${SYS_PHANTOM_LIMIT} slots (${SYS_PHANTOM_REMAINING} free • ${SYS_PHANTOM_STATUS^^})"
   printf "${C_BOLD}${C_CYAN}┃${C_RST} 💾 ${C_BOLD}Storage:${C_RST}   %-38s ${C_BOLD}${C_CYAN}┃${C_RST}\n" "${SYS_DISK_USED} / ${SYS_DISK_TOTAL} (${SYS_DISK_AVAIL} avail)"
   printf "${C_BOLD}${C_CYAN}┃${C_RST} 🌐 ${C_BOLD}PWA Hub:${C_RST}   http://127.0.0.1:8080 (Offline Ready)  ${C_BOLD}${C_CYAN}┃${C_RST}\n"
-  printf "${C_BOLD}${C_CYAN}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${C_RST}\n\n"
+  printf "${C_BOLD}${C_CYAN}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${C_RST}\n"
 }
 
-CMD="${1:-status}"
+run_autopilot() {
+  if command -v termux-wake-lock >/dev/null 2>&1; then
+    termux-wake-lock 2>/dev/null || true
+  fi
+  rm -f "$HOME/.local/bin"/agy.*.old 2>/dev/null || true
+  if [ -f "$HOME/.gemini/antigravity-cli/bin/agentapi" ] && grep -q '^exec "/usr/local/bin/language_server_shim"' "$HOME/.gemini/antigravity-cli/bin/agentapi" 2>/dev/null; then
+    "$TASKMGR_DIR/bin/agy-doctor" fix >/dev/null 2>&1 || true
+  fi
+  type pin_compute_tasks_to_gold >/dev/null 2>&1 && pin_compute_tasks_to_gold >/dev/null 2>&1 || true
+  return 0
+}
+
+print_three_buttons() {
+  printf "\n${C_BOLD}${C_GREEN}✓ АВТОПИЛОТ АКТИВЕН${C_RST} (5.1x Kryo Gold • WakeLock • Кэш очищен)\n"
+  printf "${C_BOLD}🎯 ВСЕГО 3 КОМАНДЫ ДЛЯ РАБОТЫ:${C_RST}\n"
+  printf "  1. ${C_BOLD}${C_CYAN}0g${C_RST}       — Проверить статус станции и автопилот\n"
+  printf "  2. ${C_BOLD}${C_CYAN}0g web${C_RST}   — Открыть веб-панель управления (:8080)\n"
+  printf "  3. ${C_BOLD}${C_CYAN}0g gh${C_RST}    — Управление GitHub (repos, push, create, delete)\n\n"
+}
+
+CMD="${1:-default}"
 shift || true
 
 case "$CMD" in
+  --autopilot|autopilot)
+    run_autopilot
+    ;;
+  default)
+    run_autopilot
+    print_card
+    print_three_buttons
+    ;;
   status|st)
+    run_autopilot
     print_banner
     echo ""
     "$TASKMGR_DIR/bin/tm" sys
@@ -83,6 +112,7 @@ case "$CMD" in
     ;;
   card|passport|share)
     print_card
+    echo ""
     ;;
   boost|accel|hw)
     if [ "${1:-}" = "--status" ]; then
@@ -107,6 +137,45 @@ case "$CMD" in
   gh|github)
     run_on_gold qjs -m "$LIB_DIR/gh_client.js" "$@"
     ;;
+  man|manual|guide|ru)
+    print_banner
+    cat << 'EOF'
+
+📖 ЕДИНАЯ ШПАРГАЛКА ZEROG (0g) — ЧТО НАЖИМАТЬ:
+
+1️⃣ ПРОВЕРКА, УСКОРЕНИЕ И ПАСПОРТ ТЕЛЕФОНА:
+  0g card          Красивый паспорт станции (для скриншотов в соцсети)
+  0g boost         Включить 5x ускорение на ядрах Kryo Gold + тест скорости
+  0g status        Полная сводка: ОЗУ, диск, слоты процессов (N/32), здоровье agy
+  0g fix           Починить agy после обновления, включить защиту от сна и очистить кэш
+  0g clean         Удалить старые 180 МБ файлы agy.*.old и освободить гигабайты места
+
+2️⃣ ВЕБ-ПАНЕЛЬ И ПРОСМОТР ОТЧЁТОВ В БРАУЗЕРЕ:
+  0g web           Открыть офлайн PWA-центр управления в браузере (http://127.0.0.1:8080)
+  md <файл.md>     Открыть любой Markdown-файл или диаграмму Mermaid в браузере
+  md ~/MANUAL_RU.md Открыть полный справочник в браузере
+
+3️⃣ УПРАВЛЕНИЕ ПРОЦЕССАМИ И ФОНОВЫМИ ЗАДАЧАМИ:
+  0g top           Живой монитор процессов и шкалы Phantom Process Killer (N/32)
+  0g ps            Список всех запущенных процессов
+  0g tasks         Список фоновых задач под присмотром супервизора
+  0g run <имя> -- '<команда>'   Запустить задачу в фоне с авто-логами
+
+4️⃣ РАБОТА С GITHUB БЕЗ GIT (0g gh):
+  0g gh status                         Проверить подключение к вашему GitHub
+  0g gh repos                          Показать список всех ваших репозиториев
+  0g gh create <имя> --public          Создать новый репозиторий на GitHub
+  0g gh push <репо> <путь>             Загрузить файл или всю папку на GitHub
+  0g gh topics <репо> tag1,tag2        Прописать SEO-теги репозиторию
+  0g gh release <репо> v1.0 "Title"    Выпустить официальный релиз
+  0g gh delete <репо> --yes            Удалить ненужный репозиторий на GitHub
+
+5️⃣ УПРАВЛЕНИЕ ANDROID ПО БЕЗПРОВОДНОЙ ОТЛАДКЕ (ADB Manager v2.0):
+  adb-activate                         Подключить телефон сам к себе в 1 клик (mDNS)
+  adb-activate --unlock-phantom        Снять лимит Android в 32 процесса (без Root!)
+  adb-manager                          Открыть интерактивное меню управления телефоном
+EOF
+    ;;
   top|ps|tasks|run|stop|restart|logs|info|kill|export)
     "$TASKMGR_DIR/bin/tm" "$CMD" "$@"
     ;;
@@ -118,6 +187,7 @@ Usage: 0g <command> [args...]
        zerog <command> [args...]
 
 Core Commands:
+  0g man           📖 Открыть русскую шпаргалку по всем командам (Cheat Sheet)
   0g status        Full station telemetry (System Vitals + AGY Doctor)
   0g card          Render shareable "ZeroG Mobile AI Station Passport" for screenshots
   0g boost         Pin AI/MCP workloads to Kryo Gold cores (5.1x speedup) & benchmark SoC
